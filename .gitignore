@@ -1,22 +1,32 @@
 # --- SOVEREIGN AVATAR INDUSTRIAL FILTERS ---
 
-# Segredos e Chaves (CRITICAL)
+# Segredos e Credenciais
+brasil_ai.db
+.env
 *.db
-*.db-journal
-*.env
-auth.json
 
-# Ativos Pesados (Arquivos de Mídia)
+# Modelos e Pesos (Já imortalizados no GCP via Snapshot)
+*.pth
+*.ckpt
+*.bin
+*.pt
+*.onnx
+GFPGANv1.4.pth
+
+# Assets Pesados
+outputs/
+videos/
 *.mp4
 *.mp3
 *.wav
-outputs/
-assets/
 
-# Temporários e Logs
-scratch/
-test_*.py
-logs/
+# Logs e Temporários
+*.log
+__pycache__/
+.ipynb_checkpoints/
+node_modules/
+dist/
+build/
 __pycache__/
 *.log
 
