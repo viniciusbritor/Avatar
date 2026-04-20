@@ -1,0 +1,36 @@
+# Dockerfile.runpod - Motor Avatar Lana (D-ID Mirror)
+FROM nvidia/cuda:12.1.1-devel-ubuntu22.04
+
+# Configurações de ambiente
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV VOLUME_PATH=/runpod-volume
+
+WORKDIR /app
+
+# Instalação de dependências do sistema
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    python3-dev \
+    ffmpeg \
+    git \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Clone do repositório LatentSync (ByteDance)
+RUN git clone https://github.com/bytedance/LatentSync.git .
+
+# Instalação de dependências Python
+RUN pip3 install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir fastapi uvicorn requests google-cloud-storage
+
+# Copia o código do nosso emulador para dentro da imagem
+COPY main.py .
+
+# Expondo a porta para o RunPod (HTTP Proxy Mode)
+EXPOSE 8080
+
+# O VOLUME_PATH será montado no runpod.io apontando para /runpod-volume
+# O comando de inicialização verifica se os modelos existem, senão o worker avisa
+CMD ["python3", "main.py"]

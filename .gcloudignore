@@ -1,0 +1,5 @@
+*
+!requirements.txt
+!Dockerfile
+!industrial_main.py
+!lipsync_pipeline.py

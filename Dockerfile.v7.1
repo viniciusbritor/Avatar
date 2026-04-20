@@ -1,0 +1,24 @@
+FROM lana:v6
+
+# 1. Instalação de drivers de vídeo nativos (Resolvendo a 'cegueira' do OpenCV)
+USER root
+RUN apt-get update && apt-get install -y \
+    libavcodec-dev \
+    libavformat-dev \
+    libswscale-dev \
+    libv4l-dev \
+    libxvidcore-dev \
+    libx264-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# 2. Upgrade do OpenCV e Downgrade do NumPy (Compatibilidade PyTorch)
+RUN pip uninstall -y opencv-python-headless opencv-python numpy && \
+    pip install --no-cache-dir opencv-python "numpy<2"
+
+# 3. Aceleração de download (hf_transfer)
+RUN pip install --no-cache-dir hf_transfer
+ENV HF_HUB_ENABLE_HF_TRANSFER=1
+
+# 4. Tornando o Entrypoint mais flexível para o orquestrador
+ENTRYPOINT ["python3"]
+CMD ["scripts/inference.py"]

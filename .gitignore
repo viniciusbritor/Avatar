@@ -1,0 +1,27 @@
+# --- SOVEREIGN AVATAR INDUSTRIAL FILTERS ---
+
+# Segredos e Chaves (CRITICAL)
+*.db
+*.db-journal
+*.env
+auth.json
+
+# Ativos Pesados (Arquivos de Mídia)
+*.mp4
+*.mp3
+*.wav
+outputs/
+assets/
+
+# Temporários e Logs
+scratch/
+test_*.py
+logs/
+__pycache__/
+*.log
+
+# Workspace e SO
+.DS_Store
+Thumbs.db
+.gemini/
+.antigravity/
