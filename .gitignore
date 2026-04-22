@@ -13,8 +13,9 @@ brasil_ai.db
 *.onnx
 GFPGANv1.4.pth
 
-# Assets Pesados
+# Assets Pesados e Arquivamento
 outputs/
+legacy/
 videos/
 *.mp4
 *.mp3

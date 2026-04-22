@@ -1,11 +1,11 @@
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
-from agente_lana_orchestrator import AgenteLanaOrchestrator
+from agente_lana_orchestrator import LanaIndustrialEngine
 
 def test_final_industrial_pipeline():
     print("--- INICIANDO TESTE DE PRODUCAO INDUSTRIAL V6 ---")
-    orchestrator = AgenteLanaOrchestrator()
+    orchestrator = LanaIndustrialEngine()
     
     # Teste de ponta a ponta
     test_text = "Teste final do motor industrial v6. Orquestracao completa, imagem gold registrada e entrega local validada. O sistema esta pronto para escala."

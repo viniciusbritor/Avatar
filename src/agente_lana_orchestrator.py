@@ -44,9 +44,44 @@ class LanaIndustrialEngine:
         print(f"[ERROR] Falha de SSH com {name} após várias tentativas.")
         return False
 
+    def _find_existing_engine(self):
+        """Busca por uma instância industrial já em execução para evitar cold-start."""
+        print("[MAESTRO] Buscando motores ativos no GCP...")
+        cmd = ["gcloud", "compute", "instances", "list", 
+               f"--filter=name~lana-engine-spawn- AND status=RUNNING", 
+               "--format=json", "--project", self.project_id]
+        res = subprocess.run(cmd, capture_output=True, text=True, shell=True)
+        if res.returncode == 0:
+            instances = json.loads(res.stdout)
+            if instances:
+                # Retorna a mais recente
+                inst = sorted(instances, key=lambda x: x['name'], reverse=True)[0]
+                print(f"[REUSE] Motor detectado: {inst['name']} em {inst['zone'].split('/')[-1]}")
+                return inst['name'], inst['zone'].split('/')[-1]
+        return None, None
+
     def ensure_instance_ready(self):
-        """Garante uma máquina pronta via Spawn de Imagem Gold."""
-        # GLOBAL SPAWN (Criar nova máquina da Imagem Gold - Objetivo Primário)
+        """Garante uma máquina pronta, reusando ativas ou criando novas via Gold Image."""
+        
+        # 1. Tentar REUSO (Objetivo: Velocidade Sequencial)
+        existing_name, existing_zone = self._find_existing_engine()
+        if existing_name:
+            if self._test_ssh(existing_name, existing_zone):
+                self.active_instance = existing_name
+                self.active_zone = existing_zone
+                print(f"[SUCCESS] Reusando motor aquecido: {self.active_instance}")
+                self.heartbeat() # Pulso de vida ao reusar
+                # Verificar se o servidor MCP está rodando
+                check_mcp = self.call_mcp_tool("ping")
+                if not check_mcp or "error" in check_mcp:
+                    print("[REUSE] Servidor MCP inativo. Reiniciando Bootstrap...")
+                    self.bootstrap_v18(is_prebaked=True)
+                return self.get_ip()
+            else:
+                print(f"[WARNING] Motor {existing_name} falhou no teste de vida. Purgando...")
+                self._purge_zone(existing_name, existing_zone)
+
+        # 2. GLOBAL SPAWN (Criar nova máquina - Fallback)
         for zone in self.failover_zones:
             new_name = f"lana-engine-spawn-{int(time.time())}"
             print(f"[FAILOVER] Tentando Spawn Industrial em {zone} usando Gold Image...")
@@ -56,20 +91,19 @@ class LanaIndustrialEngine:
                     self.active_zone = zone
                     try:
                         self.bootstrap_v18(is_prebaked=True)
+                        self.heartbeat() # Primeiro pulso
                         return self.get_ip()
                     except Exception as e:
                         print(f"[ERROR] Bootstrap falhou no Spawn em {zone}: {e}")
-                        # Cleanup Imediato em caso de falha de bootstrap para evitar desperdício
                         self._purge_zone(new_name, zone)
                 else:
-                    print(f"[ERROR] Máquina spawnada {new_name} em {zone} não respondeu SSH. Iniciando Purga Regional...")
+                    print(f"[ERROR] Máquina spawnada {new_name} em {zone} não respondeu SSH. Iniciando Purga...")
                     self._purge_zone(new_name, zone)
             else:
-                # Caso a criação tenha falhado mas deixado algum artefato parcial (raro mas possível)
-                print(f"[FAILOVER] Falha no spawn na zona {zone}. Garantindo limpeza de segurança...")
+                print(f"[FAILOVER] Falha no spawn na zona {zone}. Garantindo limpeza...")
                 self._purge_zone(new_name, zone)
 
-        raise Exception("CATÁSTROFE: Nenhuma GPU disponível no GCP Global e/ou falha em todas as instâncias!")
+        raise Exception("CATÁSTROFE: Nenhuma GPU disponível no GCP Global!")
 
     def _purge_zone(self, name, zone):
         """Purga absoluta de qualquer recurso na região para garantir Zero-Waste."""
@@ -182,16 +216,26 @@ class LanaIndustrialEngine:
         result = subprocess.run(cmd, capture_output=True, text=True, shell=True)
         return result.stdout.strip()
 
-    def stop_engine(self):
-        """Para a instancia GCP (Resiliência: Mantém ligada se falhou para debug)."""
+    def heartbeat(self):
+        """Envia um pulso de vida para o Sentinela remoto não desligar a máquina."""
         if not self.active_instance: return
-        print(f"[MAESTRO] O motor {self.active_instance} permanecerá ativo para o ciclo de watchdog v2.")
+        cmd = ["gcloud", "compute", "ssh", self.active_instance, 
+               "--project", self.project_id, "--zone", self.active_zone, 
+               "--tunnel-through-iap", "--quiet", "--command", 
+               "touch /workspace/heartbeat"]
+        subprocess.run(cmd, shell=True, capture_output=True)
+
+    def stop_engine(self):
+        """Libera a instância para o ciclo de ociosidade (Zero-Waste Heartbeat)."""
+        if not self.active_instance: return
+        print(f"[FINOPS] Job finalizado. Motor {self.active_instance} entra em modo de espera (15min grace period).")
 
     def upload_assets(self, local_path):
         filename = os.path.basename(local_path)
         gcs_path = f"gs://{BUCKET_NAME}/temp/{filename}"
         print(f"[GCS] Sincronizando: {gcs_path}")
         subprocess.run(["gsutil", "cp", local_path, gcs_path], capture_output=True, shell=True)
+        self.heartbeat() # Atividade detectada
         return gcs_path
 
     def download_result(self, job_id, local_folder="c:/Users/vinic/workspace_antigravity/Avatar/outputs"):
@@ -203,6 +247,7 @@ class LanaIndustrialEngine:
         if not os.path.exists(local_folder): os.makedirs(local_folder)
         print(f"[GCS] Download Final: {local_path}...")
         subprocess.run(["gsutil", "cp", gcs_path, local_path], shell=True, capture_output=True)
+        self.heartbeat() # Pulso final de entrega
         print(f"[SUCCESS] Video entregue localmente em: {local_path}")
         return local_path
 
@@ -276,6 +321,7 @@ class AgenteLanaOrchestrator:
             
             if status == "completed":
                 print("\n[SUCESSO] Renderização finalizada!")
+                self.engine.heartbeat() # Pulso final após sucesso
                 local_video = self.engine.download_result(job_id)
                 return local_video
             elif status == "failed":

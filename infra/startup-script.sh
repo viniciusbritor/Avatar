@@ -27,8 +27,18 @@ docker run -d --name lana-engine --gpus all \
 echo "[LANA] Configurando Sentinela de Inatividade..."
 cat << 'EOF' > /usr/local/bin/sentinel.sh
 #!/bin/bash
+# Lana Sentinel v15.0 - Heartbeat Aware
 UPTIME=$(cat /proc/uptime | cut -f1 -d.)
-# Espera 25 minutos (1500s) após o boot para começar a auditar
+HEARTBEAT_FILE="/workspace/heartbeat"
+
+# 1. Verificar se houve pulso de vida (Heartbeat) recente
+if [ -f "$HEARTBEAT_FILE" ]; then
+  echo "[SENTINEL] Heartbeat detectado. Mantendo máquina aquecida."
+  rm "$HEARTBEAT_FILE"
+  exit 0
+fi
+
+# 2. Se não houver heartbeat, auditar ociosidade após 25 min de boot
 if [ ${UPTIME%.*} -gt 1500 ]; then
   # Verifica utilidade da GPU. Se menor que 5%, assume ociosidade.
   GPU_UTIL=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -n 1)

@@ -23,6 +23,29 @@
 
 ---
 
+## 🏗️ ORCHESTRATION & INFRASTRUCTURE
+A alma do projeto reside no sistema de spawn e purga automatizado:
+
+| Component | File | Role |
+| :--- | :--- | :--- |
+| **Orchestrator** | [agente_lana_orchestrator.py](file:///c:/Users/vinic/workspace_antigravity/Avatar/src/agente_lana_orchestrator.py) | Master Logic: Provisioning, Failover, Cleanup |
+| **Boot Engine** | [boot_industrial_v18.sh](file:///c:/Users/vinic/workspace_antigravity/Avatar/infra/boot_industrial_v18.sh) | Container Setup, Weights Mounting, MCP Activation |
+| **MCP Bridge** | [lana_mcp_server.py](file:///c:/Users/vinic/workspace_antigravity/Avatar/src/lana_mcp_server.py) | Secure SSH Stdio communication bridge |
+
+---
+
+## 🛡️ SECURITY & FINOPS (COST CONTROL)
+Blindagem contra custos residuais e máquinas ociosas:
+
+| Control | Implementation | Protection |
+| :--- | :--- | :--- |
+| **Auto-Shutdown** | [startup-script.sh](file:///C:/Users/vinic/workspace_antigravity/Avatar/infra/startup-script.sh) | Shutdown se a máquina ficar idle por 15 min |
+| **Heartbeat Control** | `LanaIndustrialEngine.heartbeat` | Impede desligamento enquanto houver jobs ativos/sequenciais |
+| **Zero-Waste Purge** | `LanaIndustrialEngine._purge_zone` | Deleta instâncias E discos em caso de falha de boot ou término |
+| **Standard Pricing** | `provisioning-model=STANDARD` | Evita preempção durante o bake, mas mantido via purga agressiva |
+
+---
+
 ## ✅ STATUS ATUAL
 **Sem bloqueadores.** Infraestrutura reparada e em fase de validação final.
 - **Boot:** OK
@@ -58,3 +81,5 @@
 - **09:35:** **Gold Image READY.** `lana-v6-industrial-v1` status is `READY`.
 - **09:40:** **V17.1 Patch:** Sarah voice settings tuned for naturalness (Stability 0.4, Similarity 0.9) and speed increased to 1.18x.
 - **09:41:** **Naming Convention:** Pipeline updated to include full timestamp in filenames.
+- **10:40:** **Industrial Sequential Mode:** Heartbeat logic integrated into `startup-script.sh` and Orchestrator. Engine now supports "Warm-Start" for sequential renders.
+- **10:41:** **MCP Resiliência:** Added `ping` check on reuse to ensure MCP Bridge is active before starting sequential jobs.
