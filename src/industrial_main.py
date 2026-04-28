@@ -18,15 +18,44 @@ TEMP_DIR = "/workspace/outputs/temp"
 # Assegurar que diretórios existem
 os.makedirs(TEMP_DIR, exist_ok=True)
 
-# --- BIBLIOTECA DE AVATARES ---
+# --- BIBLIOTECA DE AVATARES (Sincronizada via Bucket) ---
 TEMPLATES_DIR = f"{VOLUME_PATH}/latentsync/assets"
 AVATAR_TEMPLATES = {
-    "lana_intro": f"{TEMPLATES_DIR}/lana_base_25fps.mp4",
-    "lana_comentario": f"{TEMPLATES_DIR}/lana_base_25fps.mp4",
+    "lana_intro": f"{TEMPLATES_DIR}/lana_intro.mp4",
+    "lana_comentario": f"{TEMPLATES_DIR}/lana_comentario.mp4",
+    "lana_benchmark": f"{TEMPLATES_DIR}/lana_benchmark.mp4",
     "default": f"{TEMPLATES_DIR}/lana_base_25fps.mp4"
 }
 
-jobs_db: Dict[str, dict] = {}
+import json
+
+JOBS_FILE = f"{VOLUME_PATH}/jobs_db.json"
+
+def load_jobs():
+    if os.path.exists(JOBS_FILE):
+        try:
+            with open(JOBS_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_jobs(jobs):
+    try:
+        with open(JOBS_FILE, 'w') as f:
+            json.dump(jobs, f)
+    except:
+        pass
+
+jobs_db: Dict[str, dict] = load_jobs()
+
+def update_job_status(job_id, status, result_url=None, error=None):
+    if job_id not in jobs_db:
+        jobs_db[job_id] = {"id": job_id, "created_at": time.time()}
+    jobs_db[job_id]["status"] = status
+    if result_url: jobs_db[job_id]["result_url"] = result_url
+    if error: jobs_db[job_id]["error"] = error
+    save_jobs(jobs_db)
 
 @app.get("/health")
 def health():
@@ -55,12 +84,7 @@ async def create_clip(request: DIDClipRequest, background_tasks: BackgroundTasks
     if not audio_url:
         raise HTTPException(status_code=400, detail="Este engine requer audio_url (padrão Brasil-AI).")
 
-    jobs_db[job_id] = {
-        "id": job_id,
-        "status": "created",
-        "created_at": time.time(),
-        "result_url": None
-    }
+    update_job_status(job_id, "created")
     
     background_tasks.add_task(
         run_inference, 
@@ -73,13 +97,15 @@ async def create_clip(request: DIDClipRequest, background_tasks: BackgroundTasks
 
 @app.get("/clips/{id}")
 def get_clip(id: str):
+    global jobs_db
+    jobs_db = load_jobs() # Recarregar para ver mudanças de background tasks
     if id not in jobs_db:
         raise HTTPException(status_code=404, detail="Clip não encontrado")
     return jobs_db[id]
 
 def run_inference(job_id, audio_url, template):
     try:
-        jobs_db[job_id]["status"] = "processing"
+        update_job_status(job_id, "processing")
         
         # 1. Preparar caminhos
         audio_dest = f"{TEMP_DIR}/{job_id}_audio.wav"
@@ -108,9 +134,14 @@ def run_inference(job_id, audio_url, template):
             "--seed", "1247"
         ]
         
-        inf_proc = subprocess.run(cmd, env=env, capture_output=True, text=True, cwd="/workspace/latentsync")
+        log_file = f"{TEMP_DIR}/{job_id}_render.log"
+        with open(log_file, "w") as f_log:
+            inf_proc = subprocess.run(cmd, env=env, stdout=f_log, stderr=f_log, text=True, cwd="/workspace/latentsync")
+            
         if inf_proc.returncode != 0:
-            raise Exception(f"Inference failed: {inf_proc.stderr}")
+            with open(log_file, "r") as f_log:
+                err_content = f_log.read()
+            raise Exception(f"Inference failed: {err_content}")
 
         # 5. Mux Audio/Video (Sync corrigido)
         # Usamos -shortest e streams específicos para garantir sincronia
@@ -142,22 +173,18 @@ def run_inference(job_id, audio_url, template):
                 blob = bucket.blob(remote_path)
                 blob.upload_from_filename(final_output)
                 
-                jobs_db[job_id]["status"] = "completed"
-                jobs_db[job_id]["result_url"] = f"gs://brasil-ai-avatars-vault/{remote_path}"
+                update_job_status(job_id, "completed", result_url=f"gs://brasil-ai-avatars-vault/{remote_path}")
                 print(f"🚀 [WORKER] Job {job_id} entregue ao Bucket com sucesso!")
             except Exception as upload_err:
                 print(f"❌ [WORKER] Falha no upload GCS: {upload_err}")
-                jobs_db[job_id]["status"] = "error"
-                jobs_db[job_id]["error"] = f"Upload failed: {str(upload_err)}"
+                update_job_status(job_id, "error", error=f"Upload failed: {str(upload_err)}")
         else:
             print(f"⚠️ [WORKER] Muxing falhou: {mux_proc.stderr}")
-            jobs_db[job_id]["status"] = "error"
-            jobs_db[job_id]["error"] = f"Muxing failed: {mux_proc.stderr}"
+            update_job_status(job_id, "error", error=f"Muxing failed: {mux_proc.stderr}")
 
     except Exception as e:
         print(f"❌ [WORKER] Erro no Job {job_id}: {str(e)}")
-        jobs_db[job_id]["status"] = "error"
-        jobs_db[job_id]["error"] = str(e)
+        update_job_status(job_id, "error", error=str(e))
 
 def download_file(url: str, dest: str):
     if url.startswith("gs://"):

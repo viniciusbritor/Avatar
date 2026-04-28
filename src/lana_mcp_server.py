@@ -5,94 +5,94 @@ import time
 import json
 import sys
 import logging
+from fastapi import FastAPI, BackgroundTasks
+import uvicorn
 
-# Configuração de Logs para stderr (stdout é reservado para o MCP)
+# Configuração de Logs
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    stream=sys.stderr
+    stream=sys.stdout
 )
 
-class LanaMCPServer:
-    """Servidor MCP Industrial para controle do Motor Lana via Stdio."""
+app = FastAPI(title="Lana MCP Server - Industrial HTTP Mode v2.6")
+JOBS_FILE = "/workspace/lana_jobs.json"
+
+def load_jobs():
+    if os.path.exists(JOBS_FILE):
+        try:
+            with open(JOBS_FILE, 'r') as f:
+                return json.load(f)
+        except: return {}
+    return {}
+
+def save_jobs():
+    try:
+        with open(JOBS_FILE, 'w') as f:
+            json.dump(JOBS, f)
+    except: pass
+
+JOBS = load_jobs()
+
+@app.post("/clips")
+async def create_render_job(payload: dict, background_tasks: BackgroundTasks):
+    job_id = str(uuid.uuid4())[:8]
+    audio_url = payload.get("audio_url")
+    presenter_id = payload.get("presenter_id", "sarah")
     
-    def __init__(self):
-        self.jobs = {}
-        self.workspace = "/workspace"
-        self.image_name = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/lana-engine-l4:v1.0"
+    logging.info(f"[MCP] Recebido Job {job_id} | Audio: {audio_url}")
+    
+    JOBS[job_id] = {"status": "starting", "progress": 0, "audio_url": audio_url, "presenter_id": presenter_id}
+    save_jobs()
+    
+    # Inicia o processamento em background
+    background_tasks.add_task(run_inference, job_id, audio_url, presenter_id)
+    
+    return {"job_id": job_id, "status": "queued"}
 
-    def handle_request(self, request):
-        try:
-            method = request.get("method")
-            params = request.get("params", {})
-            id_ = request.get("id")
+@app.get("/clips/{job_id}")
+async def get_status(job_id: str):
+    return JOBS.get(job_id, {"error": "Job not found"})
 
-            if method == "create_render_job":
-                result = self.create_render_job(params.get("audio_url"), params.get("presenter_id"))
-            elif method == "get_render_status":
-                result = self.get_render_status(params.get("job_id"))
-            elif method == "cleanup":
-                result = self.cleanup()
-            else:
-                result = {"error": "Method not found"}
-
-            return {"jsonrpc": "2.0", "result": result, "id": id_}
-        except Exception as e:
-            logging.error(f"Error handling request: {e}")
-            return {"jsonrpc": "2.0", "error": str(e), "id": request.get("id")}
-
-    def create_render_job(self, audio_url, presenter_id):
-        job_id = str(uuid.uuid4())
-        logging.info(f"Iniciando Job: {job_id} para {presenter_id}")
+def run_inference(job_id, audio_url, presenter_id):
+    try:
+        JOBS[job_id]["status"] = "processing"
+        save_jobs()
         
-        # Como o MCP é stdio e não queremos bloquear, 
-        # o 'industrial_main.py' ainda é útil como worker dentro do Docker, 
-        # mas aqui o MCP é o orquestrador do container.
+        # O script industrial_main.py está em /workspace/src/ na imagem v2.2 base
+        cmd = [
+            "python3", "/workspace/src/industrial_main.py",
+            "--audio", audio_url,
+            "--presenter", presenter_id,
+            "--job-id", job_id
+        ]
         
-        # Na verdade, para ser 100% resiliente, vamos apenas disparar o job 
-        # enviando para o container que já deve estar rodando.
-        try:
-            # Tentar enviar para a API local (localhost dentro da VM)
-            import requests
-            payload = {
-                "presenter_id": presenter_id,
-                "script": {"type": "audio", "audio_url": audio_url}
-            }
-            res = requests.post("http://localhost:8080/clips", json=payload, timeout=5)
-            if res.status_code == 200:
-                data = res.json()
-                data["mcp_job_id"] = job_id
-                return data
-            return {"error": f"Internal API failed: {res.text}"}
-        except Exception as e:
-            return {"error": f"Connection to container failed: {str(e)}"}
-
-    def get_render_status(self, job_id):
-        try:
-            import requests
-            res = requests.get(f"http://localhost:8080/clips/{job_id}", timeout=5)
-            if res.status_code == 200:
-                return res.json()
-            return {"error": "Job not found in container"}
-        except Exception as e:
-            return {"error": str(e)}
-
-    def cleanup(self):
-        logging.info("Executando limpeza industrial...")
-        subprocess.run(["docker", "system", "prune", "-f"], capture_output=True)
-        return {"status": "cleaned"}
-
-    def run(self):
-        logging.info("Lana MCP Server Started (Stdio Mode)")
-        for line in sys.stdin:
-            try:
-                request = json.loads(line)
-                response = self.handle_request(request)
-                sys.stdout.write(json.dumps(response) + "\n")
-                sys.stdout.flush()
-            except Exception as e:
-                logging.error(f"Invalid JSON: {line}")
+        logging.info(f"[MCP] Executando: {' '.join(cmd)}")
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd="/workspace")
+        
+        for line in process.stdout:
+            logging.info(f"[RENDER-LOG] {line.strip()}")
+            if "Progress:" in line:
+                try:
+                    prog = int(line.split("Progress:")[1].split("%")[0])
+                    JOBS[job_id]["progress"] = prog
+                    save_jobs()
+                except: pass
+        
+        process.wait()
+        if process.returncode == 0:
+            JOBS[job_id]["status"] = "completed"
+            JOBS[job_id]["progress"] = 100
+        else:
+            JOBS[job_id]["status"] = "failed"
+        save_jobs()
+            
+    except Exception as e:
+        logging.error(f"[MCP] Falha no Job {job_id}: {e}")
+        JOBS[job_id]["status"] = "failed"
+        JOBS[job_id]["error"] = str(e)
+        save_jobs()
 
 if __name__ == "__main__":
-    server = LanaMCPServer()
-    server.run()
+    logging.info("Iniciando Lana MCP Server v2.7 SOBERANO na porta 8080...")
+    uvicorn.run(app, host="0.0.0.0", port=8080)
