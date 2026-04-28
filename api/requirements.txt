@@ -1,0 +1,13 @@
+# Brasil AI Avatar API — Dependências (Cloud Run)
+# Estas são adicionadas às dependências do pipeline original (src/)
+
+# ── Servidor Web ──────────────────────────────────────────────────────────────
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.8.2
+
+# ── Pipeline Original (mesmo que src/ usa) ────────────────────────────────────
+requests==2.32.3
+agno==1.5.2
+google-cloud-storage==2.18.2
+python-dotenv==1.0.1
