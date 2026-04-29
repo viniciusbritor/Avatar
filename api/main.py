@@ -1,38 +1,37 @@
 """
-main.py — Brasil AI Avatar API (Cloud Run — GitHub Actions Trigger)
+main.py — Brasil AI Avatar API (Industrial v2.8)
 ---------------------------------------------------------------------
-API leve que recebe requisições e dispara o pipeline via GitHub Actions.
-Não roda nenhum subprocess local. Zero compatibilidade Linux/Windows.
+API que recebe requisições e orquestra DIRETAMENTE a infraestrutura
+GCP usando Agno (Maestro) e instâncias NVIDIA L4/T4.
 
 Fluxo:
-  POST /produce  →  GitHub workflow_dispatch  →  Runner Linux  →  GCS
-  GET  /status/{run_id}  →  GitHub Actions API  →  status do workflow
+  POST /produce  --> Agno Orchestrator (Background) --> GCP L4 --> GCS
 """
 
 import os
 import uuid
-import requests
 from datetime import datetime
+from typing import Dict, Optional
 
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+# Importa o Orquestrador Industrial
+from src.agente_lana_orchestrator import AgenteLanaOrchestrator
 from .secrets_manager import get_secret
 
 # ── Configuração ──────────────────────────────────────────────────────────────
-API_SECRET_KEY  = get_secret("API_SECRET_KEY", fallback="brasilai-avatar-2026")
-GITHUB_TOKEN    = get_secret("GITHUB_TOKEN", fallback="")
-GITHUB_REPO     = get_secret("GITHUB_REPO", fallback="viniciusbritor/Avatar")
-GITHUB_WORKFLOW = get_secret("GITHUB_WORKFLOW", fallback="produce_avatar.yml")
-GITHUB_BRANCH   = get_secret("GITHUB_BRANCH", fallback="master")
+API_SECRET_KEY = get_secret("API_SECRET_KEY", fallback="brasilai-avatar-2026")
 
-GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/actions/workflows/{GITHUB_WORKFLOW}"
+# Gerenciador de Estado em Memória (Para o Cloud Run, o status real deve ser consultado via GCS/Logs)
+# Mas para a sessão atual, mantemos este dicionário.
+jobs_status: Dict[str, dict] = {}
 
 app = FastAPI(
-    title="Brasil AI — Avatar API",
-    description="Dispara o pipeline de avatar via GitHub Actions.",
-    version="3.0.0",
+    title="Brasil AI — Avatar Industrial API",
+    description="Orquestração Direta via Agno (Zero-Waste GPU Pipeline).",
+    version="2.8.0",
 )
 
 
@@ -45,130 +44,94 @@ def _check_key(x_api_key: str):
         raise HTTPException(status_code=401, detail="X-API-Key inválida.")
 
 
-def _trigger_github(text: str, job_id: str) -> dict:
-    """Dispara o workflow no GitHub via workflow_dispatch."""
-    if not GITHUB_TOKEN:
-        raise HTTPException(status_code=500, detail="GITHUB_TOKEN não configurado.")
-
-    payload = {
-        "ref": GITHUB_BRANCH,
-        "inputs": {
-            "text": text,
-            "job_id": job_id
-        }
-    }
-    headers = {
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json",
-        "X-GitHub-Api-Version": "2022-11-28"
-    }
-    resp = requests.post(f"{GITHUB_API}/dispatches", json=payload, headers=headers, timeout=15)
-
-    if resp.status_code not in (200, 204):
-        raise HTTPException(
-            status_code=502,
-            detail=f"GitHub recusou o dispatch: {resp.status_code} — {resp.text[:200]}"
-        )
-    return {"dispatched": True}
-
-
-def _get_latest_run(job_id: str) -> dict:
-    """Busca o último run do workflow no GitHub."""
-    if not GITHUB_TOKEN:
-        raise HTTPException(status_code=500, detail="GITHUB_TOKEN não configurado.")
-
-    headers = {
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    resp = requests.get(
-        f"https://api.github.com/repos/{GITHUB_REPO}/actions/workflows/{GITHUB_WORKFLOW}/runs",
-        headers=headers,
-        params={"per_page": 10},
-        timeout=15
-    )
-    if resp.status_code != 200:
-        raise HTTPException(status_code=502, detail=f"Erro ao consultar GitHub: {resp.status_code}")
-
-    runs = resp.json().get("workflow_runs", [])
-    # Tenta encontrar o run com o job_id no nome
-    for run in runs:
-        if job_id in (run.get("display_title", "") + run.get("name", "") + str(run.get("id", ""))):
-            return run
-    # Retorna o mais recente se não encontrar
-    return runs[0] if runs else {}
+def run_orchestration_task(job_id: str, text: str):
+    """Tarefa de fundo que executa o Agno Orchestrator."""
+    global jobs_status
+    orchestrator = AgenteLanaOrchestrator()
+    
+    try:
+        jobs_status[job_id]["status"] = "running"
+        jobs_status[job_id]["message"] = "Provisionando GPU L4 no GCP..."
+        
+        # O orquestrador já lida com: provisionamento, health check cego (SERVER_OK) e render
+        result = orchestrator.produce_video_from_text(text, index=1, total=1)
+        
+        if result["status"] == "success":
+            jobs_status[job_id]["status"] = "completed"
+            jobs_status[job_id]["message"] = "Sucesso! Vídeo disponível no GCS."
+            jobs_status[job_id]["video_path"] = result.get("video_path")
+        else:
+            jobs_status[job_id]["status"] = "failed"
+            jobs_status[job_id]["message"] = f"Erro no Orquestrador: {result.get('message')}"
+            
+    except Exception as e:
+        jobs_status[job_id]["status"] = "failed"
+        jobs_status[job_id]["message"] = f"Erro Crítico: {str(e)}"
+    
+    finally:
+        jobs_status[job_id]["completed_at"] = datetime.utcnow().isoformat()
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.get("/health", include_in_schema=False)
 def health():
-    return {"status": "ok", "version": "3.0.0", "engine": "github-actions"}
+    return {"status": "ok", "version": "2.8.0", "engine": "Agno-Maestro-V18"}
 
 
 @app.post("/produce")
-def produce(request: ProduceRequest, x_api_key: str = Header(...)):
-    """Enfileira a produção de um avatar via GitHub Actions."""
+async def produce(request: ProduceRequest, background_tasks: BackgroundTasks, x_api_key: str = Header(...)):
+    """Enfileira a produção de um avatar via Agno Orchestrator."""
     _check_key(x_api_key)
 
     if len(request.text.strip()) < 5:
         raise HTTPException(status_code=400, detail="Texto muito curto (mínimo 5 caracteres).")
 
     job_id = str(uuid.uuid4())[:8]
-    _trigger_github(request.text, job_id)
+    
+    # Registra estado inicial
+    jobs_status[job_id] = {
+        "job_id": job_id,
+        "status": "queued",
+        "message": "Job enfileirado no Agno Orchestrator.",
+        "text": request.text,
+        "created_at": datetime.utcnow().isoformat(),
+        "video_path": None,
+        "completed_at": None
+    }
+    
+    # Dispara a orquestração em background
+    background_tasks.add_task(run_orchestration_task, job_id, request.text)
 
     return JSONResponse(content={
         "job_id": job_id,
-        "status": "triggered",
-        "message": f"Pipeline disparado no GitHub Actions. Acompanhe em: https://github.com/{GITHUB_REPO}/actions",
-        "github_actions_url": f"https://github.com/{GITHUB_REPO}/actions/workflows/{GITHUB_WORKFLOW}",
-        "created_at": datetime.utcnow().isoformat()
+        "status": "queued",
+        "message": f"Job {job_id} enfileirado! Use GET /status/{job_id}.",
+        "created_at": jobs_status[job_id]["created_at"]
     })
 
 
 @app.get("/status/{job_id}")
 def get_status(job_id: str, x_api_key: str = Header(...)):
-    """Consulta o status do último run do workflow."""
+    """Consulta o status do job de orquestração."""
     _check_key(x_api_key)
 
-    run = _get_latest_run(job_id)
-    if not run:
-        raise HTTPException(status_code=404, detail="Nenhum run encontrado.")
+    job = jobs_status.get(job_id)
+    if not job:
+        # Se não estiver em memória (Cloud Run reciclado), o usuário deve olhar o bucket GCS
+        raise HTTPException(
+            status_code=404, 
+            detail="Job não encontrado em memória. Verifique o bucket GCS para o resultado final."
+        )
 
-    status_map = {
-        "queued": "queued",
-        "in_progress": "running",
-        "completed": run.get("conclusion", "completed")
-    }
-    status = status_map.get(run.get("status", ""), run.get("status", "unknown"))
-
-    return JSONResponse(content={
-        "job_id": job_id,
-        "github_run_id": run.get("id"),
-        "status": status,
-        "conclusion": run.get("conclusion"),
-        "started_at": run.get("run_started_at"),
-        "updated_at": run.get("updated_at"),
-        "url": run.get("html_url")
-    })
+    return JSONResponse(content=job)
 
 
 @app.get("/jobs")
 def list_jobs(x_api_key: str = Header(...)):
-    """Lista os últimos runs do workflow no GitHub."""
+    """Lista os últimos jobs da sessão atual."""
     _check_key(x_api_key)
-
-    if not GITHUB_TOKEN:
-        raise HTTPException(status_code=500, detail="GITHUB_TOKEN não configurado.")
-
-    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-    resp = requests.get(
-        f"https://api.github.com/repos/{GITHUB_REPO}/actions/workflows/{GITHUB_WORKFLOW}/runs",
-        headers=headers, params={"per_page": 10}, timeout=15
-    )
-    runs = resp.json().get("workflow_runs", [])
     return JSONResponse(content={
-        "total": len(runs),
-        "jobs": [{"id": r["id"], "status": r["status"], "conclusion": r.get("conclusion"),
-                  "created_at": r["created_at"], "url": r["html_url"]} for r in runs]
+        "total": len(jobs_status),
+        "jobs": list(jobs_status.values())
     })
