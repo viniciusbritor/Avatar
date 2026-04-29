@@ -9,11 +9,26 @@ steps:
       - 'api/Dockerfile'
       - '.'
 
+  # Build da imagem L4 V2.8 (Motor de Renderização)
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.8'
+      - '-f'
+      - 'infra/Dockerfile.avatar-l4-v2.8'
+      - 'infra'
+
   # Push para Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
       - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.8'
 
   # Deploy no Cloud Run
   - name: 'gcr.io/cloud-builders/gcloud'
@@ -34,6 +49,8 @@ steps:
 
 images:
   - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest'
+  - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.8'
 
 options:
   logging: CLOUD_LOGGING_ONLY
+  machineType: 'N1_HIGHCPU_8'

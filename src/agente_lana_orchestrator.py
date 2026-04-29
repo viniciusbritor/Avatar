@@ -22,7 +22,7 @@ L4_MACHINE = "g2-standard-12"
 
 ELEVENLABS_API_KEY = get_secret("ELEVEN_LABS_API_KEY")
 VOICE_ID = "XrExE9yKIg1WjnnlVkGX" # Sarah Customizada ElevenLabs (Reference p_5125)
-DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.7"
+DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.8"
 
 class LanaIndustrialEngine:
     """Ferramentas de infraestrutura GCP com Inteligência Maestro V18 (Gold Standard)."""
@@ -248,7 +248,7 @@ class LanaIndustrialEngine:
         ]
         res = self._run_ssh_cmd(check_cmd)
         
-        DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.7"
+        DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.8"
         if res.returncode != 0 or "true" not in res.stdout.lower():
             print(f"[AGNO] Container não encontrado. Criando container passivo...")
             # Auto-criar o container passivo
@@ -269,11 +269,11 @@ class LanaIndustrialEngine:
         health_cmd = [
             "gcloud", "compute", "ssh", self.active_instance, "--project", self.project_id,
             "--zone", self.active_zone, "--tunnel-through-iap", "--command",
-            "\"curl -s --connect-timeout 2 http://localhost:8080/clips > /dev/null && echo 'OK'\"",
+            "\"curl -s --connect-timeout 2 http://localhost:8080/health > /dev/null && echo 'SERVER_OK'\"",
             "--quiet"
         ]
         health_res = self._run_ssh_cmd(health_cmd)
-        if "OK" in health_res.stdout:
+        if "SERVER_OK" in health_res.stdout:
             print(f"[AGNO] Motor e Servidor MCP operacionais.")
             return
 
@@ -306,7 +306,7 @@ class LanaIndustrialEngine:
     def bootstrap_v18(self, is_prebaked=False):
         """Bootstrap Industrial v18 — 100% GCS-Native + LatentSync Setup. Zero dependências locais."""
         GCS_SCRIPTS = "gs://brasil-ai-avatars-vault/scripts"
-        DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.7"
+        DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.8"
         
         def _ssh(cmd_str, label="CMD"):
             """Helper para executar SSH com retry."""
@@ -378,12 +378,13 @@ class LanaIndustrialEngine:
         print("[AGNO] [7/7] Iniciando Servidor FastAPI...")
         _ssh("sudo docker exec -d lana-engine python3 /workspace/src/industrial_main.py", "SERVER")
 
-        # Health Check
+        # Health Check Blindado (V2.8)
         print("[AGNO] Aguardando servidor responder...")
         for i in range(20):
             time.sleep(5)
-            health_res = _ssh("curl -s --connect-timeout 2 http://localhost:8080/health", "HEALTH")
-            if "ok" in health_res.stdout:
+            # Descartar lixo de log do gcloud e focar no SERVER_OK
+            health_res = _ssh("curl -s --connect-timeout 2 http://localhost:8080/health > /dev/null && echo 'SERVER_OK'", "HEALTH")
+            if "SERVER_OK" in health_res.stdout:
                 print(f"[AGNO] Servidor operacional em {(i+1)*5}s.")
                 return
         

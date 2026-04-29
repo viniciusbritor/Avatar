@@ -5,7 +5,7 @@
 echo "[V19] Iniciando Ignição Relâmpago (Pre-Baked Mode)..."
 
 # 1. Identificar a imagem (Prioridade para o argumento do Orquestrador)
-IMG_NAME=${1:-"us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.1"}
+IMG_NAME=${1:-"us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.8"}
 echo "[V19] Usando Imagem: $IMG_NAME"
 
 # 2. Restaurar código se necessário

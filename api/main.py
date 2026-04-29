@@ -18,12 +18,14 @@ from fastapi import FastAPI, HTTPException, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from .secrets_manager import get_secret
+
 # ── Configuração ──────────────────────────────────────────────────────────────
-API_SECRET_KEY  = os.getenv("API_SECRET_KEY", "brasilai-avatar-2026")
-GITHUB_TOKEN    = os.getenv("GITHUB_TOKEN", "")
-GITHUB_REPO     = os.getenv("GITHUB_REPO", "viniciusbritor/Avatar")
-GITHUB_WORKFLOW = os.getenv("GITHUB_WORKFLOW", "produce_avatar.yml")
-GITHUB_BRANCH   = os.getenv("GITHUB_BRANCH", "main")
+API_SECRET_KEY  = get_secret("API_SECRET_KEY", fallback="brasilai-avatar-2026")
+GITHUB_TOKEN    = get_secret("GITHUB_TOKEN", fallback="")
+GITHUB_REPO     = get_secret("GITHUB_REPO", fallback="viniciusbritor/Avatar")
+GITHUB_WORKFLOW = get_secret("GITHUB_WORKFLOW", fallback="produce_avatar.yml")
+GITHUB_BRANCH   = get_secret("GITHUB_BRANCH", fallback="master")
 
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/actions/workflows/{GITHUB_WORKFLOW}"
 

@@ -10,7 +10,7 @@ if [ ! -z "$1" ]; then
     IMG_NAME="$1"
 elif [[ $GPU_NAME == *"L4"* ]]; then
     echo "[GPU] NVIDIA L4 Detectada. Selecionando Imagem de Alta Performance (Ada Lovelace)."
-    IMG_NAME="us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/lana-engine-l4:v1.0"
+    IMG_NAME="us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.8"
 elif [[ $GPU_NAME == *"T4"* ]]; then
     echo "[GPU] NVIDIA T4 Detectada. Selecionando Imagem Gold de Resiliência."
     IMG_NAME="us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/lana-v6-t4-industrial-v1:latest"
@@ -45,7 +45,7 @@ echo "[BOOT] Iniciando Motor Lana Industrial..."
 sudo docker stop lana-engine 2>/dev/null || true
 sudo docker rm lana-engine 2>/dev/null || true
 
-echo "[DOCKER] Iniciando container passivo (v2.7)..."
+echo "[DOCKER] Iniciando container passivo (v2.8)..."
 sudo docker run -d --name lana-engine --gpus all \
     --network host \
     -v /workspace:/workspace \
