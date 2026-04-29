@@ -41,6 +41,7 @@ steps:
       - '--region=us-east1'
       - '--service-account=avatar-api-sa@brasili-ia-news.iam.gserviceaccount.com'
       - '--set-env-vars=API_SECRET_KEY=brasilai-avatar-2026,STARTUP_SCRIPT_PATH=/app/infra/startup_arch4.sh,GCS_BUCKET=brasil-ai-avatars-vault,GCS_DB_BLOB=brasil_ai.db'
+      - '--set-secrets=ELEVEN_LABS_API_KEY=ELEVEN_LABS_API_KEY:latest,DID_BASIC_AUTH=DID_BASIC_AUTH:latest'
       - '--timeout=3600'
       - '--memory=2Gi'
       - '--cpu=2'
