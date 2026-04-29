@@ -147,7 +147,8 @@ class LanaIndustrialEngine:
 
     def _create_gpu_instance(self, name, zone):
         """Cria uma instância L4 usando Arquitetura 4 (Nativa + Startup Script)."""
-        startup_script_path = "c:/Users/vinic/workspace_antigravity/Avatar/infra/startup_arch4.sh"
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        startup_script_path = os.path.join(base_dir, "infra", "startup_arch4.sh")
         
         cmd = [
             "gcloud", "compute", "instances", "create", name,
@@ -433,7 +434,10 @@ class LanaIndustrialEngine:
         self.heartbeat() # Atividade detectada
         return gcs_path
 
-    def download_result(self, job_id, local_folder="c:/Users/vinic/workspace_antigravity/Avatar/outputs"):
+    def download_result(self, job_id, local_folder=None):
+        if local_folder is None:
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            local_folder = os.path.join(base_dir, "outputs")
         now = datetime.now()
         timestamp = now.strftime("%d_%m_%Y_%H_%M_%S")
         filename = f"lana_{timestamp}_{job_id}.mp4"
@@ -467,7 +471,10 @@ class LanaIndustrialEngine:
 
     def _update_dashboard_js(self, step, progress, msg):
         """Exporta o status para o Dashboard visual (JS-Injection)."""
-        db_path = "c:/Users/vinic/workspace_antigravity/Avatar/outputs/status_db.js"
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        out_dir = os.path.join(base_dir, "outputs")
+        if not os.path.exists(out_dir): os.makedirs(out_dir, exist_ok=True)
+        db_path = os.path.join(out_dir, "status_db.js")
         data = {
             "timestamp": datetime.now().strftime("%H:%M:%S"),
             "step": step,
@@ -491,9 +498,11 @@ class AgenteLanaOrchestrator:
     def generate_audio(self, text, output_path=None):
         if output_path is None:
             import uuid
-            if not os.path.exists("c:/Users/vinic/workspace_antigravity/Avatar/temp"):
-                os.makedirs("c:/Users/vinic/workspace_antigravity/Avatar/temp")
-            output_path = os.path.abspath(f"c:/Users/vinic/workspace_antigravity/Avatar/temp/audio_{uuid.uuid4().hex[:8]}.mp3")
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            temp_dir = os.path.join(base_dir, "temp")
+            if not os.path.exists(temp_dir):
+                os.makedirs(temp_dir, exist_ok=True)
+            output_path = os.path.join(temp_dir, f"audio_{uuid.uuid4().hex[:8]}.mp3")
         
         print(f"[TTS] Gerando Sarah (Brazil Identity) para: '{text[:50]}...'")
         url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
