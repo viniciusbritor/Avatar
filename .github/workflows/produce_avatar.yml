@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout do repositório
         uses: actions/checkout@v4
+        with:
+          ref: master
 
       - name: Autenticar no GCP
         uses: google-github-actions/auth@v2
