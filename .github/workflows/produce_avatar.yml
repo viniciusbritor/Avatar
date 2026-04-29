@@ -1,0 +1,65 @@
+name: 🎬 Avatar Production Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      text:
+        description: 'Texto para o avatar falar'
+        required: true
+        type: string
+      job_id:
+        description: 'ID do job para rastreamento'
+        required: false
+        type: string
+        default: 'manual'
+
+jobs:
+  produce-avatar:
+    name: Produzir Avatar
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Autenticar no GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Configurar gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: brasili-ia-news
+
+      - name: Configurar Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Instalar dependências
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Produzir Avatar
+        env:
+          AVATAR_TEXT: ${{ inputs.text }}
+          JOB_ID: ${{ inputs.job_id }}
+          GCS_BUCKET: brasil-ai-avatars-vault
+        run: |
+          echo "🎬 Iniciando produção do Avatar"
+          echo "📝 Texto: $AVATAR_TEXT"
+          echo "🆔 Job ID: $JOB_ID"
+          python src/produce_requested_videos.py --text "$AVATAR_TEXT" --job-id "$JOB_ID"
+
+      - name: Upload resultado para GCS
+        if: always()
+        run: |
+          if ls outputs/*.mp4 2>/dev/null; then
+            gsutil -m cp outputs/*.mp4 gs://brasil-ai-avatars-vault/outputs/
+            echo "✅ Vídeo enviado para gs://brasil-ai-avatars-vault/outputs/"
+          else
+            echo "⚠️ Nenhum vídeo encontrado em outputs/"
+          fi

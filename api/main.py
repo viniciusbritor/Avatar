@@ -1,170 +1,172 @@
 """
-main.py — Brasil AI Avatar API (Cloud Run)
--------------------------------------------
-Servidor FastAPI que expõe o pipeline de criação de avatares como
-uma API REST. Substitui o produce_requested_videos.py manual.
+main.py — Brasil AI Avatar API (Cloud Run — GitHub Actions Trigger)
+---------------------------------------------------------------------
+API leve que recebe requisições e dispara o pipeline via GitHub Actions.
+Não roda nenhum subprocess local. Zero compatibilidade Linux/Windows.
 
-Endpoints:
-  POST  /produce          → Solicita criação de um avatar
-  GET   /status/{job_id}  → Consulta o progresso de um job
-  GET   /jobs             → Lista todos os jobs da sessão
-  GET   /health           → Health check do servidor
-
-Autenticação: Bearer token via env var API_SECRET_KEY.
+Fluxo:
+  POST /produce  →  GitHub workflow_dispatch  →  Runner Linux  →  GCS
+  GET  /status/{run_id}  →  GitHub Actions API  →  status do workflow
 """
 
 import os
-import sys
 import uuid
-import threading
-import traceback
+import requests
 from datetime import datetime
-from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Depends, Security
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-# ── Adicionar src/ ao path ────────────────────────────────────────────────────
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-
-from secrets_manager import get_secret
-from cloud_engine import CloudLanaEngine
-from agente_lana_orchestrator import AgenteLanaOrchestrator
-
 # ── Configuração ──────────────────────────────────────────────────────────────
-API_SECRET_KEY = os.getenv("API_SECRET_KEY", get_secret("AVATAR_API_KEY", fallback="brasil-ai-2025"))
+API_SECRET_KEY  = os.getenv("API_SECRET_KEY", "brasilai-avatar-2026")
+GITHUB_TOKEN    = os.getenv("GITHUB_TOKEN", "")
+GITHUB_REPO     = os.getenv("GITHUB_REPO", "viniciusbritor/Avatar")
+GITHUB_WORKFLOW = os.getenv("GITHUB_WORKFLOW", "produce_avatar.yml")
+GITHUB_BRANCH   = os.getenv("GITHUB_BRANCH", "main")
+
+GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/actions/workflows/{GITHUB_WORKFLOW}"
 
 app = FastAPI(
     title="Brasil AI — Avatar API",
-    description="API soberana de criação de avatares com LatentSync + ElevenLabs Sarah.",
-    version="2.0.0",
+    description="Dispara o pipeline de avatar via GitHub Actions.",
+    version="3.0.0",
 )
 
-security = HTTPBearer()
 
-# ── Armazenamento em memória de Jobs ─────────────────────────────────────────
-# Para escalabilidade futura, substituir por Firestore/Redis.
-jobs: dict[str, dict] = {}
-
-
-# ── Schemas ───────────────────────────────────────────────────────────────────
 class ProduceRequest(BaseModel):
     text: str
-    force_new_gpu: bool = False
 
 
-class ProduceResponse(BaseModel):
-    job_id: str
-    status: str
-    message: str
-    created_at: str
+def _check_key(x_api_key: str):
+    if x_api_key != API_SECRET_KEY:
+        raise HTTPException(status_code=401, detail="X-API-Key inválida.")
 
 
-# ── Auth ──────────────────────────────────────────────────────────────────────
-def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)):
-    if credentials.credentials != API_SECRET_KEY:
-        raise HTTPException(status_code=401, detail="Token inválido.")
-    return credentials
+def _trigger_github(text: str, job_id: str) -> dict:
+    """Dispara o workflow no GitHub via workflow_dispatch."""
+    if not GITHUB_TOKEN:
+        raise HTTPException(status_code=500, detail="GITHUB_TOKEN não configurado.")
 
+    payload = {
+        "ref": GITHUB_BRANCH,
+        "inputs": {
+            "text": text,
+            "job_id": job_id
+        }
+    }
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+    }
+    resp = requests.post(f"{GITHUB_API}/dispatches", json=payload, headers=headers, timeout=15)
 
-# ── Worker (Roda em Thread Separada) ─────────────────────────────────────────
-def _run_production(job_id: str, text: str, force_gpu: bool):
-    """Executa o pipeline completo em background. Atualiza jobs[job_id]."""
-    try:
-        jobs[job_id]["status"] = "running"
-        jobs[job_id]["message"] = "Inicializando orquestrador..."
-
-        # Instancia o orquestrador com o engine adaptado para Cloud Run
-        orchestrator = AgenteLanaOrchestrator()
-        orchestrator.engine = CloudLanaEngine()  # Substituir engine local pelo cloud
-
-        def progress_cb(msg):
-            jobs[job_id]["message"] = msg
-
-        jobs[job_id]["message"] = "Provisionando GPU L4 no GCP..."
-        result = orchestrator.produce_video_from_text(
-            text,
-            index=1,
-            total=1,
-            force_gpu=force_gpu
+    if resp.status_code not in (200, 204):
+        raise HTTPException(
+            status_code=502,
+            detail=f"GitHub recusou o dispatch: {resp.status_code} — {resp.text[:200]}"
         )
+    return {"dispatched": True}
 
-        if result["status"] == "success":
-            jobs[job_id].update({
-                "status": "completed",
-                "message": "Vídeo entregue com sucesso!",
-                "video_path": result.get("video_path"),
-                "completed_at": datetime.utcnow().isoformat(),
-            })
-        else:
-            jobs[job_id].update({
-                "status": "failed",
-                "message": result.get("message", "Erro desconhecido"),
-            })
 
-    except Exception as e:
-        jobs[job_id].update({
-            "status": "failed",
-            "message": f"Erro crítico: {str(e)[:300]}",
-            "traceback": traceback.format_exc()[:1000],
-        })
+def _get_latest_run(job_id: str) -> dict:
+    """Busca o último run do workflow no GitHub."""
+    if not GITHUB_TOKEN:
+        raise HTTPException(status_code=500, detail="GITHUB_TOKEN não configurado.")
+
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    resp = requests.get(
+        f"https://api.github.com/repos/{GITHUB_REPO}/actions/workflows/{GITHUB_WORKFLOW}/runs",
+        headers=headers,
+        params={"per_page": 10},
+        timeout=15
+    )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"Erro ao consultar GitHub: {resp.status_code}")
+
+    runs = resp.json().get("workflow_runs", [])
+    # Tenta encontrar o run com o job_id no nome
+    for run in runs:
+        if job_id in (run.get("display_title", "") + run.get("name", "") + str(run.get("id", ""))):
+            return run
+    # Retorna o mais recente se não encontrar
+    return runs[0] if runs else {}
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
-@app.post("/produce", response_model=ProduceResponse, summary="Solicita criação de um avatar")
-def produce(request: ProduceRequest, token=Depends(verify_token)):
-    """
-    Inicia a produção de um vídeo avatar em background.
-    Retorna imediatamente com um `job_id` para acompanhar o progresso.
-    """
-    if not request.text or len(request.text.strip()) < 5:
-        raise HTTPException(status_code=400, detail="Texto muito curto (mínimo 5 caracteres).")
-
-    job_id = str(uuid.uuid4())[:8]
-    jobs[job_id] = {
-        "job_id": job_id,
-        "status": "queued",
-        "message": "Job enfileirado. Aguardando worker...",
-        "text": request.text,
-        "created_at": datetime.utcnow().isoformat(),
-        "video_path": None,
-        "completed_at": None,
-    }
-
-    # Dispara em background para não bloquear a resposta HTTP
-    thread = threading.Thread(
-        target=_run_production,
-        args=(job_id, request.text, request.force_new_gpu),
-        daemon=True
-    )
-    thread.start()
-
-    return ProduceResponse(
-        job_id=job_id,
-        status="queued",
-        message=f"Job {job_id} enfileirado! Use GET /status/{job_id} para acompanhar.",
-        created_at=jobs[job_id]["created_at"],
-    )
-
-
-@app.get("/status/{job_id}", summary="Consulta o status de um job")
-def get_status(job_id: str, token=Depends(verify_token)):
-    """Retorna o estado atual de um job de produção."""
-    job = jobs.get(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail=f"Job '{job_id}' não encontrado.")
-    return JSONResponse(content=job)
-
-
-@app.get("/jobs", summary="Lista todos os jobs da sessão")
-def list_jobs(token=Depends(verify_token)):
-    """Retorna todos os jobs processados desde o último deploy."""
-    return JSONResponse(content={"total": len(jobs), "jobs": list(jobs.values())})
-
 
 @app.get("/health", include_in_schema=False)
 def health():
-    """Health check para o Cloud Run."""
-    return {"status": "ok", "version": "2.0.0", "service": "brasil-ai-avatar-api"}
+    return {"status": "ok", "version": "3.0.0", "engine": "github-actions"}
+
+
+@app.post("/produce")
+def produce(request: ProduceRequest, x_api_key: str = Header(...)):
+    """Enfileira a produção de um avatar via GitHub Actions."""
+    _check_key(x_api_key)
+
+    if len(request.text.strip()) < 5:
+        raise HTTPException(status_code=400, detail="Texto muito curto (mínimo 5 caracteres).")
+
+    job_id = str(uuid.uuid4())[:8]
+    _trigger_github(request.text, job_id)
+
+    return JSONResponse(content={
+        "job_id": job_id,
+        "status": "triggered",
+        "message": f"Pipeline disparado no GitHub Actions. Acompanhe em: https://github.com/{GITHUB_REPO}/actions",
+        "github_actions_url": f"https://github.com/{GITHUB_REPO}/actions/workflows/{GITHUB_WORKFLOW}",
+        "created_at": datetime.utcnow().isoformat()
+    })
+
+
+@app.get("/status/{job_id}")
+def get_status(job_id: str, x_api_key: str = Header(...)):
+    """Consulta o status do último run do workflow."""
+    _check_key(x_api_key)
+
+    run = _get_latest_run(job_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Nenhum run encontrado.")
+
+    status_map = {
+        "queued": "queued",
+        "in_progress": "running",
+        "completed": run.get("conclusion", "completed")
+    }
+    status = status_map.get(run.get("status", ""), run.get("status", "unknown"))
+
+    return JSONResponse(content={
+        "job_id": job_id,
+        "github_run_id": run.get("id"),
+        "status": status,
+        "conclusion": run.get("conclusion"),
+        "started_at": run.get("run_started_at"),
+        "updated_at": run.get("updated_at"),
+        "url": run.get("html_url")
+    })
+
+
+@app.get("/jobs")
+def list_jobs(x_api_key: str = Header(...)):
+    """Lista os últimos runs do workflow no GitHub."""
+    _check_key(x_api_key)
+
+    if not GITHUB_TOKEN:
+        raise HTTPException(status_code=500, detail="GITHUB_TOKEN não configurado.")
+
+    headers = {"Authorization": f"Bearer {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+    resp = requests.get(
+        f"https://api.github.com/repos/{GITHUB_REPO}/actions/workflows/{GITHUB_WORKFLOW}/runs",
+        headers=headers, params={"per_page": 10}, timeout=15
+    )
+    runs = resp.json().get("workflow_runs", [])
+    return JSONResponse(content={
+        "total": len(runs),
+        "jobs": [{"id": r["id"], "status": r["status"], "conclusion": r.get("conclusion"),
+                  "created_at": r["created_at"], "url": r["html_url"]} for r in runs]
+    })
