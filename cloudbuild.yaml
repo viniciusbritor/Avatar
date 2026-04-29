@@ -1,0 +1,39 @@
+steps:
+  # Build da imagem usando api/Dockerfile com contexto raiz
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest'
+      - '-f'
+      - 'api/Dockerfile'
+      - '.'
+
+  # Push para Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest'
+
+  # Deploy no Cloud Run
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'avatar-api'
+      - '--image=us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest'
+      - '--project=brasili-ia-news'
+      - '--region=us-east1'
+      - '--service-account=avatar-api-sa@brasili-ia-news.iam.gserviceaccount.com'
+      - '--set-env-vars=API_SECRET_KEY=brasilai-avatar-2026,STARTUP_SCRIPT_PATH=/app/infra/startup_arch4.sh,GCS_BUCKET=brasil-ai-avatars-vault,GCS_DB_BLOB=brasil_ai.db'
+      - '--timeout=3600'
+      - '--memory=2Gi'
+      - '--cpu=2'
+      - '--no-allow-unauthenticated'
+      - '--quiet'
+
+images:
+  - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

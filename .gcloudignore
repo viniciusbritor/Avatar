@@ -1,5 +1,27 @@
+# .gcloudignore — Brasil AI Avatar API (Cloud Run Build Context)
+# Exclui arquivos desnecessários do upload para Cloud Build.
+# Apenas o que a API precisa é enviado.
+
+# Ignorar tudo por padrão
 *
-!requirements.txt
-!Dockerfile
-!industrial_main.py
-!lipsync_pipeline.py
+
+# Liberar: código da API
+!api/
+!api/**
+
+# Liberar: código do engine original (src/)
+!src/
+!src/**
+
+# Liberar: startup script para provisionar a GPU VM
+!infra/
+!infra/startup_arch4.sh
+
+# Liberar: config do build
+!cloudbuild.yaml
+
+# Excluir cache Python e outputs
+__pycache__/
+*.pyc
+outputs/
+.git/
