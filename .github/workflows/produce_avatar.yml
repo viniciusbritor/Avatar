@@ -40,10 +40,10 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Instalar dependências
+      - name: Instalar dependências (Runner Mode)
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          pip install agno google-cloud-storage requests
 
       - name: Produzir Avatar
         env:
