@@ -415,7 +415,7 @@ class LanaIndustrialEngine:
 
         # 7. Iniciar Servidor (industrial_main.py)
         print("[AGNO] [7/7] Iniciando Servidor FastAPI...")
-        _ssh("sudo docker exec -d lana-engine python3 /workspace/src/industrial_main.py", "SERVER")
+        _ssh("sudo docker exec -d lana-engine bash -c \"pip install fastapi uvicorn google-cloud-storage requests python-multipart && python3 /workspace/src/industrial_main.py > /workspace/outputs/temp/server.log 2>&1\"", "SERVER")
 
         # Health Check Blindado (V2.8)
         print("[AGNO] Aguardando servidor responder...")

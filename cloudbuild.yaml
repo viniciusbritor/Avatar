@@ -45,7 +45,7 @@ steps:
       - '--timeout=3600'
       - '--memory=2Gi'
       - '--cpu=2'
-      - '--no-allow-unauthenticated'
+      - '--allow-unauthenticated'
       - '--quiet'
 
 images:

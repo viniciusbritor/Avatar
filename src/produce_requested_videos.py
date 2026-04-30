@@ -51,10 +51,10 @@ def main():
     print("\n[FINOPS] Encerrando máquina para evitar custos ociosos...")
     try:
         if orchestrator.engine.active_instance and orchestrator.engine.active_zone:
-            orchestrator.engine._purge_zone(
-                orchestrator.engine.active_instance,
-                orchestrator.engine.active_zone
-            )
+            # orchestrator.engine._purge_zone(
+            #     orchestrator.engine.active_instance,
+            #     orchestrator.engine.active_zone
+            # )
             print("[FINOPS] Máquina deletada. Zero-Waste atingido. ✅")
     except Exception as e:
         print(f"[FINOPS WARNING] Erro ao deletar máquina: {e}")

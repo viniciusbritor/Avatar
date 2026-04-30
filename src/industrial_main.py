@@ -71,26 +71,38 @@ class DIDClipRequest(BaseModel):
     script: DIDScript
     audio_path: Optional[str] = None
     resolution: Optional[int] = 512
+    webhook_url: Optional[str] = None
+    job_id: Optional[str] = None
+
+# LOCK DE ESCALA HORIZONTAL
+IS_BUSY = False
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "gpu": os.path.exists("/dev/nvidia0")}
+    return {"status": "ok", "gpu": os.path.exists("/dev/nvidia0"), "busy": IS_BUSY}
 
 @app.post("/clips")
 async def create_clip(request: DIDClipRequest, background_tasks: BackgroundTasks):
-    job_id = str(uuid.uuid4())
+    global IS_BUSY
+    if IS_BUSY:
+        raise HTTPException(status_code=429, detail="GPU is currently busy. Scale-out required.")
+        
+    # Aceita job_id externo ou gera um novo
+    job_id = request.job_id or str(uuid.uuid4())
     audio_url = request.script.audio_url
     
     if not audio_url:
         raise HTTPException(status_code=400, detail="Este engine requer audio_url (padrão Brasil-AI).")
 
+    IS_BUSY = True
     update_job_status(job_id, "created")
     
     background_tasks.add_task(
-        run_inference, 
+        run_inference_wrapper, 
         job_id, 
         audio_url, 
-        request.presenter_id
+        request.presenter_id,
+        request.webhook_url
     )
     
     return {"id": job_id, "status": "created"}
@@ -103,7 +115,34 @@ def get_clip(id: str):
         raise HTTPException(status_code=404, detail="Clip não encontrado")
     return jobs_db[id]
 
-def run_inference(job_id, audio_url, template):
+def notify_webhook(webhook_url: str, payload: dict):
+    if not webhook_url: return
+    print(f"🔗 [WEBHOOK] Enviando callback para {webhook_url}")
+    api_key = os.environ.get("API_SECRET_KEY", "brasilai-avatar-2026")
+    headers = {"X-API-Key": api_key, "Content-Type": "application/json"}
+    
+    import time
+    for attempt in range(5):
+        try:
+            res = requests.post(webhook_url, json=payload, headers=headers, timeout=10)
+            if res.status_code == 200:
+                print("✅ [WEBHOOK] Callback entregue com sucesso.")
+                return
+            print(f"⚠️ [WEBHOOK] Tentativa {attempt+1} retornou status {res.status_code}")
+        except Exception as e:
+            print(f"❌ [WEBHOOK] Erro ao chamar webhook (Tentativa {attempt+1}): {e}")
+        time.sleep(5)
+    print("❌ [WEBHOOK] Desistindo de enviar callback após 5 tentativas.")
+
+def run_inference_wrapper(*args, **kwargs):
+    global IS_BUSY
+    try:
+        run_inference(*args, **kwargs)
+    finally:
+        print("🔓 [WORKER] Lock liberado. GPU pronta para novo Job.")
+        IS_BUSY = False
+
+def run_inference(job_id, audio_url, template, webhook_url=None):
     try:
         update_job_status(job_id, "processing")
         
@@ -173,18 +212,34 @@ def run_inference(job_id, audio_url, template):
                 blob = bucket.blob(remote_path)
                 blob.upload_from_filename(final_output)
                 
-                update_job_status(job_id, "completed", result_url=f"gs://brasil-ai-avatars-vault/{remote_path}")
+                final_gcs_url = f"gs://brasil-ai-avatars-vault/{remote_path}"
+                update_job_status(job_id, "completed", result_url=final_gcs_url)
                 print(f"🚀 [WORKER] Job {job_id} entregue ao Bucket com sucesso!")
+                
+                # Notifica Cloud Run!
+                notify_webhook(webhook_url, {
+                    "job_id": job_id,
+                    "status": "completed",
+                    "video_path": final_gcs_url
+                })
+                
+                # Zero-Waste: Se o processo foi um sucesso absoluto e comunicou a API, 
+                # podemos já dar um hint para o Sentinela desligar a máquina
+                os.system("touch /workspace/idle_now")
+                
             except Exception as upload_err:
                 print(f"❌ [WORKER] Falha no upload GCS: {upload_err}")
                 update_job_status(job_id, "error", error=f"Upload failed: {str(upload_err)}")
+                notify_webhook(webhook_url, {"job_id": job_id, "status": "failed", "error": f"Upload fail: {str(upload_err)}"})
         else:
             print(f"⚠️ [WORKER] Muxing falhou: {mux_proc.stderr}")
             update_job_status(job_id, "error", error=f"Muxing failed: {mux_proc.stderr}")
+            notify_webhook(webhook_url, {"job_id": job_id, "status": "failed", "error": f"Muxing failed: {mux_proc.stderr}"})
 
     except Exception as e:
         print(f"❌ [WORKER] Erro no Job {job_id}: {str(e)}")
         update_job_status(job_id, "error", error=str(e))
+        notify_webhook(webhook_url, {"job_id": job_id, "status": "failed", "error": str(e)})
 
 def download_file(url: str, dest: str):
     if url.startswith("gs://"):
