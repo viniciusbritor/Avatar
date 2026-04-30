@@ -336,7 +336,11 @@ class LanaIndustrialEngine:
         print("[AGNO] Motor e Servidor MCP acionados.")
 
     def bootstrap_v18(self, is_prebaked=False):
-        """Bootstrap Industrial v18 — 100% GCS-Native + LatentSync Setup. Zero dependências locais."""
+        """
+        Bootstrap Cirúrgico e Limpo (Serverless-like).
+        Assume que a imagem Docker (avatar-l4) já contém as dependências pesadas (LatentSync, FastAPI, etc).
+        Apenas sincroniza scripts/assets rápidos do bucket e sobe a API.
+        """
         GCS_SCRIPTS = "gs://brasil-ai-avatars-vault/scripts"
         DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.8"
         
@@ -351,55 +355,35 @@ class LanaIndustrialEngine:
             if res.returncode != 0:
                 print(f"[AGNO] WARN {label}: {res.stderr[:200]}")
             return res
+
+        print("\n[AGNO] === INICIANDO BOOTSTRAP LIMPO (V3) ===")
         
-        # 1. Preparar filesystem + Auth Docker
-        print("[AGNO] [1/7] Preparando filesystem na VM...")
-        for i in range(5):
-            res = _ssh("sudo mkdir -p /workspace/src /workspace/outputs/temp && "
+        # 1. Preparar filesystem e autenticação
+        print("[AGNO] [1/5] Preparando ambiente...")
+        for _ in range(3):
+            res = _ssh("sudo mkdir -p /workspace/src /workspace/outputs/temp /workspace/latentsync/assets && "
                        "sudo chmod -R 777 /workspace && "
                        "sudo gcloud auth configure-docker us-east1-docker.pkg.dev --quiet", "PREP")
             if res.returncode == 0: break
-            time.sleep(15)
+            time.sleep(5)
         else:
             raise Exception(f"Falha no setup inicial: {res.stderr}")
 
-        # 2. Clonar LatentSync (se não existir)
-        if not is_prebaked:
-            print("[AGNO] [2/7] Restaurando LatentSync...")
-            _ssh("if [ ! -d /workspace/latentsync ]; then "
-                 "git clone https://github.com/bytedance/LatentSync /workspace/latentsync && "
-                 "chmod -R 777 /workspace/latentsync; "
-                 "else echo 'LatentSync já presente'; fi", "GIT")
+        # 2. Sincronizar Assets e Scripts do Bucket (Rápido, 100% Nuvem)
+        print("[AGNO] [2/5] Sincronizando Assets e Scripts (Bucket)...")
+        _ssh(f"gsutil -m cp gs://lana-weights-universal/assets/*.mp4 /workspace/latentsync/assets/ 2>/dev/null || true && "
+             f"gsutil -m cp {GCS_SCRIPTS}/* /workspace/ 2>/dev/null || true", "BUCKET_SYNC")
 
-        # 3. Sincronizar Assets (vídeos base dos avatares)
-        if not is_prebaked:
-            print("[AGNO] [3/7] Sincronizando Assets de Avatares...")
-            _ssh("mkdir -p /workspace/latentsync/assets && "
-                 "gsutil -m cp gs://lana-weights-universal/assets/*.mp4 /workspace/latentsync/assets/ 2>/dev/null || "
-                 "echo 'Assets já sincronizados ou bucket indisponível'", "ASSETS")
-
-        # 4. Mapear Checkpoints (symlinks para /mnt/weights)
-        print("[AGNO] [4/7] Mapeando Checkpoints Industriais...")
+        # 3. Preparar Golden Disk (Modelos grandes montados instantaneamente)
+        print("[AGNO] [3/5] Mapeando Discos de Modelos...")
         _ssh("rm -rf /workspace/latentsync/checkpoints && "
-             "ln -sfn /mnt/weights /workspace/latentsync/checkpoints && "
-             "mkdir -p /workspace/latentsync/checkpoints/gfpgan && "
-             "ln -sfn /mnt/weights/gfpgan/GFPGANv1.4.pth /workspace/latentsync/checkpoints/gfpgan/GFPGANv1.4.pth && "
-             "chmod -R 777 /workspace/latentsync/checkpoints", "CHECKPOINTS")
+             "ln -sfn /mnt/weights /workspace/latentsync/checkpoints 2>/dev/null || true", "CHECKPOINTS")
 
-        # 5. Sincronizar Scripts do GCS + Aplicar Patches
-        print("[AGNO] [5/7] Sincronizando scripts e patches...")
-        _ssh(f"gsutil -m cp {GCS_SCRIPTS}/* /workspace/ && "
-             "cp /workspace/industrial_main.py /workspace/src/industrial_main.py && "
-             "cp /workspace/lipsync_pipeline.py /workspace/src/lipsync_pipeline.py && "
-             "cp /workspace/industrial_main.py /workspace/latentsync/industrial_main.py && "
-             "mkdir -p /workspace/latentsync/latentsync/pipelines/ && "
-             "cp /workspace/lipsync_pipeline.py /workspace/latentsync/latentsync/pipelines/lipsync_pipeline.py", "SCRIPTS")
-
-        # 6. Pull Docker + Iniciar container passivo + Patch BasicSR
-        print("[AGNO] [6/7] Iniciando container (Docker Pull + Run + Patch)...")
+        # 4. Pull e Run do Docker (Imagem Imutável)
+        print("[AGNO] [4/5] Iniciando Motor de IA (Docker)...")
         api_key = get_secret("API_SECRET_KEY", fallback="brasilai-avatar-2026")
         
-        pull_cmd = f"sudo docker pull {DOCKER_IMAGE}; " if not is_prebaked else "echo 'Usando imagem Docker pré-aquecida'; "
+        pull_cmd = f"sudo docker pull {DOCKER_IMAGE}; " if not is_prebaked else ""
         
         _ssh(f"sudo docker rm -f lana-engine 2>/dev/null; "
              f"{pull_cmd}"
@@ -407,27 +391,22 @@ class LanaIndustrialEngine:
              f"-e API_SECRET_KEY='{api_key}' "
              f"-v /workspace:/workspace -v /mnt/weights:/mnt/weights "
              f"{DOCKER_IMAGE} tail -f /dev/null", "DOCKER")
-        
-        # Patch BasicSR (compatibilidade torchvision)
-        _ssh("sudo docker exec lana-engine bash -c \""
-             "sed -i 's/torchvision.transforms.functional_tensor/torchvision.transforms.functional/' "
-             "/usr/local/lib/python3.10/dist-packages/basicsr/data/degradations.py 2>/dev/null || true\"", "PATCH")
 
-        # 7. Iniciar Servidor (industrial_main.py)
-        print("[AGNO] [7/7] Iniciando Servidor FastAPI...")
-        _ssh("sudo docker exec -d lana-engine bash -c \"pip install fastapi uvicorn google-cloud-storage requests python-multipart && python3 /workspace/src/industrial_main.py > /workspace/outputs/temp/server.log 2>&1\"", "SERVER")
+        # 5. Ligar a API RESTful
+        print("[AGNO] [5/5] Subindo API RESTful...")
+        # Fallback tolerante para pacotes básicos caso a v2.8 ainda não os tenha.
+        _ssh("sudo docker exec -d lana-engine bash -c \"pip install fastapi uvicorn google-cloud-storage requests python-multipart >/dev/null 2>&1 || true; python3 /workspace/industrial_main.py > /workspace/outputs/temp/server.log 2>&1\"", "SERVER")
 
-        # Health Check Blindado (V2.8)
-        print("[AGNO] Aguardando servidor responder...")
-        for i in range(60): # 300 segundos total (5 minutos)
+        # Health Check
+        print("[AGNO] Aguardando servidor responder (REST API)...")
+        for i in range(24): # 120 segundos total
             time.sleep(5)
-            # Descartar lixo de log do gcloud e focar no SERVER_OK
             health_res = _ssh("curl -s --connect-timeout 2 http://localhost:8080/health > /dev/null && echo 'SERVER_OK'", "HEALTH")
             if "SERVER_OK" in health_res.stdout:
-                print(f"[AGNO] Servidor operacional em {(i+1)*5}s.")
+                print(f"[AGNO] API operacional em {(i+1)*5}s. Máquina Pronta!")
                 return
         
-        raise Exception("Servidor não respondeu após 300s.")
+        raise Exception("API não respondeu após 120s. Verifique os logs do Docker.")
 
     def get_ip(self):
         """Recupera o IP público da máquina usando SDK Nativo, sem bash."""
