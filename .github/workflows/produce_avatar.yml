@@ -52,6 +52,8 @@ jobs:
           JOB_ID: ${{ inputs.job_id }}
           GCS_BUCKET: brasil-ai-avatars-vault
           PYTHONPATH: .
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           echo "🎬 Iniciando produção do Avatar"
           echo "📝 Texto: $AVATAR_TEXT"
