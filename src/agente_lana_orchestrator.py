@@ -580,7 +580,6 @@ class AgenteLanaOrchestrator:
                 "Sua resposta final ao usuário DEVE incluir a palavra 'SUCESSO' confirmando que o job foi despachado para a GPU com sucesso."
             ],
             tools=[self.prepare_gpu_infrastructure, self.generate_and_upload_audio, self.dispatch_render_job],
-            show_tool_calls=True,
             markdown=True
         )
 
