@@ -51,6 +51,7 @@ jobs:
           AVATAR_TEXT: ${{ inputs.text }}
           JOB_ID: ${{ inputs.job_id }}
           GCS_BUCKET: brasil-ai-avatars-vault
+          PYTHONPATH: .
         run: |
           echo "🎬 Iniciando produção do Avatar"
           echo "📝 Texto: $AVATAR_TEXT"
