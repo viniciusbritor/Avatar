@@ -47,6 +47,10 @@ class LanaIndustrialEngine:
         else:
             cmd_str = cmd_list
             
+        import sys
+        if sys.platform != "win32":
+            use_y = False
+            
         final_cmd = f"echo y | {cmd_str}" if use_y else cmd_str
         res = subprocess.run(final_cmd, shell=True, capture_output=capture, text=True, encoding='utf-8', errors='ignore')
         return res
