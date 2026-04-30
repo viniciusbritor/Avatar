@@ -45,6 +45,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install agno google-genai google-cloud-storage requests python-dotenv
 
+      - name: Fetch Secrets from GCP
+        run: |
+          GEMINI_KEY=$(gcloud secrets versions access latest --secret="GEMINI_API_KEY")
+          echo "::add-mask::$GEMINI_KEY"
+          echo "GEMINI_API_KEY=$GEMINI_KEY" >> $GITHUB_ENV
+          echo "GOOGLE_API_KEY=$GEMINI_KEY" >> $GITHUB_ENV
+
       - name: Produzir Avatar
         env:
           ENVIRONMENT: cloud
@@ -52,8 +59,6 @@ jobs:
           JOB_ID: ${{ inputs.job_id }}
           GCS_BUCKET: brasil-ai-avatars-vault
           PYTHONPATH: .
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           echo "🎬 Iniciando produção do Avatar"
           echo "📝 Texto: $AVATAR_TEXT"
