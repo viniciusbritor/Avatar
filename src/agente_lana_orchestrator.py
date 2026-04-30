@@ -562,6 +562,7 @@ class AgenteLanaOrchestrator:
         gemini_key = get_secret("GEMINI_API_KEY")
         if gemini_key:
             os.environ["GEMINI_API_KEY"] = gemini_key
+            os.environ["GOOGLE_API_KEY"] = gemini_key
             
         self.infra_pc, self.docker_pc, self.avatar_pc = 0, 0, 0
         self.infra_msg, self.docker_msg, self.avatar_msg = "Aguardando...", "Aguardando...", "Aguardando..."
