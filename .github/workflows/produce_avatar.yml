@@ -43,7 +43,7 @@ jobs:
       - name: Instalar dependências (Runner Mode)
         run: |
           python -m pip install --upgrade pip
-          pip install agno google-cloud-storage requests python-dotenv
+          pip install agno google-genai google-cloud-storage requests python-dotenv
 
       - name: Produzir Avatar
         env:
