@@ -342,7 +342,7 @@ class LanaIndustrialEngine:
         Apenas sincroniza scripts/assets rápidos do bucket e sobe a API.
         """
         GCS_SCRIPTS = "gs://brasil-ai-avatars-vault/scripts"
-        DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.8"
+        DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.9"
         
         def _ssh(cmd_str, label="CMD"):
             """Helper para executar SSH com retry."""
@@ -394,8 +394,8 @@ class LanaIndustrialEngine:
 
         # 5. Ligar a API RESTful
         print("[AGNO] [5/5] Subindo API RESTful...")
-        # Fallback tolerante para pacotes básicos caso a v2.8 ainda não os tenha.
-        _ssh("sudo docker exec -d lana-engine bash -c \"pip install fastapi uvicorn google-cloud-storage requests python-multipart >/dev/null 2>&1 || true; python3 /workspace/industrial_main.py > /workspace/outputs/temp/server.log 2>&1\"", "SERVER")
+        # Imagem v2.9 já possui todas as dependências no PYTHONPATH nativo.
+        _ssh("sudo docker exec -d lana-engine python3 /workspace/industrial_main.py > /workspace/outputs/temp/server.log 2>&1", "SERVER")
 
         # Health Check
         print("[AGNO] Aguardando servidor responder (REST API)...")
