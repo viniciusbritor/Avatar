@@ -61,6 +61,12 @@ jobs:
         if: always()
         run: |
           if ls outputs/*.mp4 2>/dev/null; then
+            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            for f in outputs/*.mp4; do
+              NEW_NAME="outputs/${JOB_ID}_${TIMESTAMP}.mp4"
+              mv "$f" "$NEW_NAME"
+              echo "🚀 Renomeado: $f -> $NEW_NAME"
+            done
             gsutil -m cp outputs/*.mp4 gs://brasil-ai-avatars-vault/outputs/
             echo "✅ Vídeo enviado para gs://brasil-ai-avatars-vault/outputs/"
           else
