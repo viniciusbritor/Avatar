@@ -418,27 +418,32 @@ class LanaIndustrialEngine:
             raise Exception(f"Falha no setup inicial: {res.stderr}")
 
         # 2. Sincronizar Assets e Scripts do Bucket
-        print("[AGNO] [2/6] Sincronizando Assets e Scripts (Bucket)...")
+        print("[AGNO] [2/7] Sincronizando Assets e Scripts (Bucket)...")
         _ssh(f"gsutil -m cp gs://lana-weights-universal/assets/*.mp4 /workspace/latentsync/assets/ 2>/dev/null || true && "
              f"gsutil -m cp {GCS_SCRIPTS}/* /workspace/ 2>/dev/null || true", "BUCKET_SYNC")
 
+        # 2b. Sincronizar codebase LatentSync completa
+        print("[AGNO] [3/7] Sincronizando codebase LatentSync (~120 arquivos)...")
+        _ssh("mkdir -p /workspace/latentsync && "
+             "gsutil -m cp -r gs://brasil-ai-avatars-vault/latentsync/* /workspace/latentsync/ 2>/dev/null || true", "LATENTSYNC")
+
         # 3. Preparar Golden Disk
-        print("[AGNO] [3/6] Mapeando Discos de Modelos...")
+        print("[AGNO] [4/7] Mapeando Discos de Modelos...")
         _ssh("rm -rf /workspace/latentsync/checkpoints && "
              "ln -sfn /mnt/weights /workspace/latentsync/checkpoints 2>/dev/null || true", "CHECKPOINTS")
 
-        # 4. Pull da imagem Docker (comando isolado com keepalive — pode levar 5+ min)
+        # 4. Pull da imagem Docker
         if not is_prebaked:
-            print("[AGNO] [4/6] Baixando imagem Docker (~15GB, pode levar ate 10min)...")
+            print("[AGNO] [5/7] Baixando imagem Docker (~15GB, pode levar ate 10min)...")
             pull_res = _ssh(f"sudo docker pull {DOCKER_IMAGE}", "DOCKER_PULL", max_retries=2)
             if pull_res.returncode != 0:
                 raise Exception(f"Falha ao baixar imagem Docker: {pull_res.stderr[:300]}")
             print("[AGNO] Imagem Docker baixada com sucesso.")
         else:
-            print("[AGNO] [4/6] Imagem pre-baked, pulando pull.")
+            print("[AGNO] [5/7] Imagem pre-baked, pulando pull.")
 
         # 5. Subir container (comando separado)
-        print("[AGNO] [5/6] Iniciando container Docker...")
+        print("[AGNO] [6/7] Iniciando container Docker...")
         api_key = get_secret("API_SECRET_KEY", fallback="brasilai-avatar-2026")
         run_res = _ssh(f"sudo docker rm -f lana-engine 2>/dev/null; "
                        f"sudo docker run -d --name lana-engine --gpus all --network host "
@@ -458,7 +463,7 @@ class LanaIndustrialEngine:
             raise Exception("Container Docker não subiu após 30s.")
 
         # 6. Iniciar API RESTful (comando separado)
-        print("[AGNO] [6/6] Subindo API RESTful...")
+        print("[AGNO] [7/7] Subindo API RESTful...")
         _ssh("sudo docker exec -d lana-engine python3 /workspace/industrial_main.py "
              "> /workspace/outputs/temp/server.log 2>&1", "SERVER")
 
