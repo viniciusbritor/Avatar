@@ -316,7 +316,7 @@ class LanaIndustrialEngine:
         check_cmd = [
             "gcloud", "compute", "ssh", self.active_instance, "--project", self.project_id,
             "--zone", self.active_zone, "--tunnel-through-iap", "--command",
-            "\"sudo docker inspect -f '{{.State.Running}}' lana-engine 2>/dev/null\"",
+            "sudo docker inspect -f '{{.State.Running}}' lana-engine 2>/dev/null",
             "--quiet"
         ]
         res = self._run_ssh_cmd(check_cmd)
@@ -327,12 +327,12 @@ class LanaIndustrialEngine:
             run_cmd = [
                 "gcloud", "compute", "ssh", self.active_instance, "--project", self.project_id,
                 "--zone", self.active_zone, "--tunnel-through-iap", "--command",
-                f"\"sudo docker rm -f lana-engine 2>/dev/null; "
+                f"sudo docker rm -f lana-engine 2>/dev/null; "
                 f"sudo gcloud auth configure-docker us-east1-docker.pkg.dev --quiet; "
                 f"sudo docker pull {DOCKER_IMAGE}; "
                 f"sudo docker run -d --name lana-engine --gpus all --network host "
                 f"-v /workspace:/workspace -v /mnt/weights:/mnt/weights "
-                f"{DOCKER_IMAGE} tail -f /dev/null\"",
+                f"{DOCKER_IMAGE} tail -f /dev/null",
                 "--quiet"
             ]
             self._run_ssh_cmd(run_cmd)
@@ -341,7 +341,7 @@ class LanaIndustrialEngine:
         health_cmd = [
             "gcloud", "compute", "ssh", self.active_instance, "--project", self.project_id,
             "--zone", self.active_zone, "--tunnel-through-iap", "--command",
-            "\"curl -s --connect-timeout 2 http://localhost:8080/health > /dev/null && echo 'SERVER_OK'\"",
+            "curl -s --connect-timeout 2 http://localhost:8080/health > /dev/null && echo 'SERVER_OK'",
             "--quiet"
         ]
         health_res = self._run_ssh_cmd(health_cmd)
@@ -356,10 +356,10 @@ class LanaIndustrialEngine:
         sync_cmd = [
             "gcloud", "compute", "ssh", self.active_instance, "--project", self.project_id,
             "--zone", self.active_zone, "--tunnel-through-iap", "--command",
-            f"\"mkdir -p /workspace/src && "
+            f"mkdir -p /workspace/src && "
             f"gsutil -m cp {GCS_SCRIPTS}/* /workspace/ && "
             f"cp /workspace/industrial_main.py /workspace/src/industrial_main.py && "
-            f"cp /workspace/lipsync_pipeline.py /workspace/src/lipsync_pipeline.py\"",
+            f"cp /workspace/lipsync_pipeline.py /workspace/src/lipsync_pipeline.py",
             "--quiet"
         ]
         self._run_ssh_cmd(sync_cmd)
@@ -368,7 +368,7 @@ class LanaIndustrialEngine:
         exec_cmd = [
             "gcloud", "compute", "ssh", self.active_instance, "--project", self.project_id,
             "--zone", self.active_zone, "--tunnel-through-iap", "--command",
-            "\"sudo docker exec -d lana-engine python3 /workspace/src/industrial_main.py\"",
+            "sudo docker exec -d lana-engine python3 /workspace/src/industrial_main.py",
             "--quiet"
         ]
         self._run_ssh_cmd(exec_cmd)
@@ -393,7 +393,7 @@ class LanaIndustrialEngine:
                     "--ssh-flag=-o ServerAliveInterval=30",
                     "--ssh-flag=-o ServerAliveCountMax=20",
                     "--ssh-flag=-o TCPKeepAlive=yes",
-                    "--command", f"\"{cmd_str}\"", "--quiet"
+                    "--command", cmd_str, "--quiet"
                 ]
                 res = self._run_ssh_cmd(cmd)
                 if res.returncode == 0:
@@ -498,7 +498,7 @@ class LanaIndustrialEngine:
         cmd = ["gcloud", "compute", "ssh", self.active_instance, 
                "--project", self.project_id, "--zone", self.active_zone, 
                "--tunnel-through-iap", "--quiet", "--command", 
-               "\"touch /workspace/heartbeat\""]
+               "touch /workspace/heartbeat"]
         self._run_ssh_cmd(cmd)
 
     def _heartbeat_loop(self):
