@@ -44,4 +44,4 @@ echo "[BOOT] Iniciando servidor FastAPI..."
 
 # Passa as variáveis de ambiente explicitamente para o processo uvicorn
 exec env CLOUDSDK_CONFIG="$CLOUDSDK_CONFIG" HOME="$HOME" \
-    python3 -m uvicorn api.main:app --host 0.0.0.0 --port 8080 --workers 1
+    python3 -m uvicorn api.main:app --host 0.0.0.0 --port 8080 --workers 4 --timeout-keep-alive 3600

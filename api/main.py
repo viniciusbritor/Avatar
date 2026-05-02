@@ -12,6 +12,7 @@ import os
 import uuid
 import time
 import json
+import threading
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -163,10 +164,9 @@ async def render_worker(
     x_api_key: str = Header(...),
     x_cloudtasks_queuename: Optional[str] = Header(None)
 ):
-    """Worker interno acionado *exclusivamente* pelo Cloud Tasks. Tem retry automático."""
+    """Worker interno acionado *exclusivamente* pelo Cloud Tasks. Roda em background thread para não bloquear o Cloud Run."""
     _check_key(x_api_key)
     
-    # Ponto 1: Blindagem contra Bypass da Fila
     if not x_cloudtasks_queuename:
         raise HTTPException(status_code=403, detail="Acesso Negado. Rota blindada exclusiva para o Cloud Tasks.")
         
@@ -174,36 +174,47 @@ async def render_worker(
         raise HTTPException(status_code=500, detail="DB indisponível")
         
     doc_ref = JOBS_COLLECTION.document(payload.job_id)
+    
+    # Verificar se job já está em processamento (evitar duplicatas de retry)
+    existing = doc_ref.get()
+    if existing.exists:
+        existing_status = existing.to_dict().get("status", "")
+        if existing_status in ("running", "rendering", "completed"):
+            return {"status": "already_processing", "job_id": payload.job_id}
+    
     doc_ref.update({
         "status": "running", 
         "message": "Processamento L4 isolado iniciado..."
     })
     
-    orchestrator = AgenteLanaOrchestrator()
-    try:
-        # Ponto 2: Injetando a webhook_url para quebra do processamento síncrono
-        result = orchestrator.produce_video_from_text(payload.text, job_id=payload.job_id, index=1, total=1, webhook_url=payload.webhook_url)
-        if result["status"] == "success":
-            doc_ref.update({
-                "status": "rendering",
-                "message": "Enviado à GPU. Aguardando finalização assíncrona..."
-            })
-            return {"status": "success"}
-        else:
+    def run_orchestration():
+        orchestrator = AgenteLanaOrchestrator()
+        try:
+            result = orchestrator.produce_video_from_text(
+                payload.text, job_id=payload.job_id, index=1, total=1, 
+                webhook_url=payload.webhook_url
+            )
+            if result["status"] == "success":
+                doc_ref.update({
+                    "status": "rendering",
+                    "message": "Enviado à GPU. Aguardando finalização assíncrona..."
+                })
+            else:
+                doc_ref.update({
+                    "status": "failed",
+                    "message": f"Erro Orquestrador: {result.get('message')}",
+                    "completed_at": datetime.utcnow().isoformat()
+                })
+        except Exception as e:
             doc_ref.update({
                 "status": "failed",
-                "message": f"Erro Orquestrador: {result.get('message')}",
+                "message": f"Crash do Sistema (Worker): {str(e)}",
                 "completed_at": datetime.utcnow().isoformat()
             })
-            return {"status": "handled_failure"}
-    except Exception as e:
-        doc_ref.update({
-            "status": "failed",
-            "message": f"Crash do Sistema (Worker): {str(e)}",
-            "completed_at": datetime.utcnow().isoformat()
-        })
-        # Lança erro 500 para forçar o Cloud Tasks a usar a Política de Retry
-        raise HTTPException(status_code=500, detail=str(e))
+    
+    thread = threading.Thread(target=run_orchestration, daemon=True)
+    thread.start()
+    return {"status": "accepted", "job_id": payload.job_id}
 
 
 @app.post("/webhook/render-complete", include_in_schema=False)
