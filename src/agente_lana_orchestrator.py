@@ -8,8 +8,8 @@ import sys
 import sqlite3
 import zipfile
 from datetime import datetime
-from agno.agent import Agent
-from agno.models.google import Gemini
+# from agno.agent import Agent
+# from agno.models.openai import OpenAIChat
 from google.cloud import storage
 from src.secrets_manager import get_secret
 
@@ -22,8 +22,10 @@ L4_IMAGE_FAMILY = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts
 L4_MACHINE = "g2-standard-12"
 
 ELEVENLABS_API_KEY = get_secret("ELEVEN_LABS_API_KEY")
+if ELEVENLABS_API_KEY:
+    ELEVENLABS_API_KEY = ELEVENLABS_API_KEY.strip()
 VOICE_ID = "XrExE9yKIg1WjnnlVkGX" # Sarah Customizada ElevenLabs (Reference p_5125)
-DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.7"
+DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4-v2.9:latest"
 
 class LanaIndustrialEngine:
     """Ferramentas de infraestrutura GCP com Inteligência Maestro V18 (Gold Standard)."""
@@ -88,11 +90,12 @@ class LanaIndustrialEngine:
             for zone, response in agg_list:
                 if response.instances:
                     for inst in response.instances:
-                        # Filtro: Nome começa com lana-engine- e está RUNNING
-                        if inst.name.startswith("lana-engine-") and inst.status == "RUNNING":
+                        # Filtro: Nome começa com lana-engine- e está RUNNING ou TERMINATED
+                        if inst.name.startswith("lana-engine-") and inst.status in ("RUNNING", "TERMINATED"):
                             instances.append({
                                 "name": inst.name,
-                                "zone": zone.split('/')[-1]
+                                "zone": zone.split('/')[-1],
+                                "status": inst.status
                             })
             
             if instances:
@@ -122,7 +125,19 @@ class LanaIndustrialEngine:
             self.active_instance = existing_name
             self.active_zone = existing_zone
             
-            if self._test_ssh(existing_name, existing_zone, max_retries=2, progress_callback=progress_callback):
+            # Se estiver TERMINATED, tenta ligar. Se falhar por estoque, deleta para liberar cota e segue.
+            if inst.get("status") == "TERMINATED":
+                if progress_callback: progress_callback(f"Acordando motor {existing_name} em {existing_zone}...")
+                start_ok = self._start_instance(inst)
+                if not start_ok:
+                    if progress_callback: progress_callback(f"Zona {existing_zone} sem estoque. Liberando cota e buscando globalmente...")
+                    self._purge_zone(existing_name, existing_zone)
+                    continue # Cota liberada, tenta a próxima
+                
+                # Esperar um pouco para o IAP/SSH estabilizar
+                time.sleep(20)
+
+            if self._test_ssh(existing_name, existing_zone, max_retries=5, progress_callback=progress_callback):
                 self._ensure_server_running() # Garante que o /health está acessível
                 ip = self.get_ip()
                 if ip:
@@ -537,35 +552,74 @@ class LanaIndustrialEngine:
         except: pass
 
 class AgenteLanaOrchestrator:
-    """Orquestrador V18 (Cognitive Maestro): Resiliência e Autocorreção via Agno Agent."""
+    """Orquestrador V18 (Linear Maestro): Estabilidade Industrial via Execução Direta."""
     
     def __init__(self):
         self.engine = LanaIndustrialEngine()
         
         gemini_key = get_secret("GEMINI_API_KEY")
         if gemini_key:
+            gemini_key = gemini_key.strip()
             os.environ["GEMINI_API_KEY"] = gemini_key
             os.environ["GOOGLE_API_KEY"] = gemini_key
             
         self.infra_pc, self.docker_pc, self.avatar_pc = 0, 0, 0
         self.infra_msg, self.docker_msg, self.avatar_msg = "Aguardando...", "Aguardando...", "Aguardando..."
 
-        # Inicializa o Cérebro Cognitivo
-        self.agent = Agent(
-            model=Gemini(id="gemini-2.5-flash"),
-            description="Você é o Maestro Industrial, o orquestrador autônomo da produção de Avatares da Brasil AI.",
-            instructions=[
-                "Seu objetivo é iniciar a produção de um vídeo de avatar dado um texto e um ID de trabalho.",
-                "Siga EXATAMENTE esta ordem linear de ferramentas:",
-                "1. Chame `prepare_gpu_infrastructure` para garantir que o motor na nuvem está ativo.",
-                "2. Chame `generate_and_upload_audio` com o texto para criar a voz e o GCS path.",
-                "3. Chame `dispatch_render_job` passando o GCS path do áudio, o job_id e o webhook_url, para delegar a renderização assíncrona à GPU.",
-                "Se alguma ferramenta retornar uma string com 'ERRO', você DEVE analisar o motivo e tentar contornar ou repetir a chamada (máximo 2 vezes).",
-                "Sua resposta final ao usuário DEVE incluir a palavra 'SUCESSO' confirmando que o job foi despachado para a GPU com sucesso."
-            ],
-            tools=[self.prepare_gpu_infrastructure, self.generate_and_upload_audio, self.dispatch_render_job],
-            markdown=True
-        )
+        # Mock do agente para manter compatibilidade com o resto da API
+        class SimpleMaestro:
+            def __init__(self, parent):
+                self.parent = parent
+            def run(self, prompt):
+                # Execução Linear Blindada
+                print(f"[MAESTRO] Iniciando Orquestração Linear...")
+                
+                # Extrair metadados básicos do prompt
+                job_id = "unknown"
+                if "ID '" in prompt:
+                    job_id = prompt.split("ID '")[1].split("'")[0]
+                elif "ID: " in prompt:
+                    job_id = prompt.split("ID: ")[1].split(".")[0]
+                
+                text = "Texto não identificado"
+                if "texto '" in prompt:
+                    text = prompt.split("texto '")[1].split("'")[0]
+                elif "Texto: " in prompt:
+                    text = prompt.split("Texto: ")[1].split("ID: ")[0]
+                
+                webhook_url = ""
+                if "webhook_url '" in prompt:
+                    webhook_url = prompt.split("webhook_url '")[1].split("'")[0]
+
+                try:
+                    # Passo 1: Infraestrutura (Garante GPU L4)
+                    self.parent._update_view(i_pc=10, i_m="Preparando GPU L4...")
+                    ip = self.parent.engine.ensure_instance_ready(
+                        progress_callback=lambda m: self.parent._update_view(i_m=m)
+                    )
+                    self.parent._update_view(i_pc=100, i_m=f"GPU Ativa em {ip}", d_pc=100, d_m="Container Pronto")
+                    
+                    # Passo 2: Áudio (Sarah ElevenLabs)
+                    self.parent._update_view(a_pc=10, a_m="Gerando Áudio Sarah...")
+                    audio_local = self.parent.generate_audio_local(text)
+                    audio_gcs = self.parent.engine.upload_assets(audio_local, job_id=job_id)
+                    self.parent._update_view(a_pc=50, a_m="Áudio no Vault GCS")
+                    
+                    # Passo 3: Renderização (Delegar para GPU)
+                    self.parent._update_view(a_pc=80, a_m="Despachando para GPU...")
+                    render_res = self.parent.dispatch_render_job(audio_gcs, job_id, webhook_url=webhook_url)
+                    
+                    self.parent._update_view(a_pc=100, a_m="SUCESSO")
+                    
+                    # Simula a estrutura de resposta do Agno
+                    class AgnoResponse:
+                        def __init__(self, content): self.content = content
+                    return AgnoResponse(f"SUCESSO: {render_res}")
+                except Exception as e:
+                    self.parent._update_view(err=True, a_m=f"ERRO: {str(e)[:50]}")
+                    raise e
+
+        self.agent = SimpleMaestro(self)
 
     def _update_view(self, i_pc=None, d_pc=None, a_pc=None, i_m=None, d_m=None, a_m=None, err=False):
         if i_pc is not None: self.infra_pc = i_pc
@@ -577,7 +631,7 @@ class AgenteLanaOrchestrator:
         self.engine.print_triple_progress(self.infra_pc, self.docker_pc, self.avatar_pc, self.infra_msg, self.docker_msg, self.avatar_msg, error=err)
 
     def generate_audio_local(self, text, output_path=None):
-        """TTS Nativo. Chamado apenas pela ferramenta do Agente."""
+        """TTS Nativo ElevenLabs."""
         if output_path is None:
             import uuid
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -600,35 +654,8 @@ class AgenteLanaOrchestrator:
             return output_path
         raise Exception(f"Erro ElevenLabs: {res.text}")
 
-    # --- AGNO TOOLS ---
-
-    def prepare_gpu_infrastructure(self) -> str:
-        """Garante que a máquina GPU L4 na nuvem está provisionada e pronta. Retorna uma mensagem de sucesso com IP ou erro."""
-        self._update_view(i_pc=5, i_m="Acionando Agente Infra...")
-        try:
-            ip = self.engine.ensure_instance_ready(progress_callback=lambda m: self._update_view(i_m=m))
-            self._update_view(i_pc=100, i_m="GPU L4 Ativa", d_pc=100, d_m="Container Pronto")
-            return f"Sucesso. GPU Pronta. IP Operacional: {ip}"
-        except Exception as e:
-            self._update_view(err=True, i_m=f"FALHA GPU: {str(e)[:50]}")
-            return f"ERRO ao preparar GPU: {str(e)}"
-
-    def generate_and_upload_audio(self, text: str, job_id: str) -> str:
-        """Gera a voz em TTS a partir do texto e envia para o Cloud Storage. Retorna o GCS Path (gs://...)."""
-        self._update_view(a_pc=10, a_m="Gerando Voz Sarah (Cognitivo)...")
-        try:
-            local_audio = self.generate_audio_local(text)
-            self._update_view(a_pc=30, a_m="Sincronizando áudio GCS...")
-            gcs_path = self.engine.upload_assets(local_audio, job_id=job_id)
-            self._update_view(a_pc=40, a_m="Áudio no GCS")
-            return gcs_path
-        except Exception as e:
-            self._update_view(err=True, a_m=f"FALHA Áudio: {str(e)[:50]}")
-            return f"ERRO no TTS/Upload: {str(e)}"
-
-    def dispatch_render_job(self, audio_gcs_url: str, job_id: str, webhook_url: str = None) -> str:
+    def dispatch_render_job(self, audio_gcs_url: str, job_id: str, webhook_url: str = "") -> str:
         """Envia o comando de renderização assíncrono para a GPU via MCP."""
-        self._update_view(a_pc=45, a_m="Injetando Job via MCP (Cognitivo)...")
         try:
             job_res = self.engine.call_mcp_tool("create_render_job", {
                 "audio_url": audio_gcs_url,
@@ -637,72 +664,38 @@ class AgenteLanaOrchestrator:
                 "job_id": job_id
             })
             if not job_res or "error" in job_res:
-                return f"ERRO ao despachar job: {job_res}"
-            self._update_view(a_pc=100, a_m="Renderização Assíncrona Delegada à GPU!")
-            return f"Sucesso! Job delegado para processamento em background (Async). ID Remoto: {job_id}"
+                raise Exception(f"Erro no motor: {job_res}")
+            return f"Job {job_id} delegado com sucesso."
         except Exception as e:
-            return f"ERRO ao despachar job: {str(e)}"
-
-    def wait_and_download_video(self, job_id: str) -> str:
-        """Faz polling na GPU até a conclusão do vídeo e o baixa localmente. Retorna o caminho absoluto do vídeo."""
-        try:
-            for i in range(120): # 30 minutos max (15s * 120)
-                time.sleep(15)
-                status_res = self.engine.call_mcp_tool("get_render_status", {"job_id": job_id})
-                if not status_res or "error" in status_res:
-                     return f"ERRO crítico no motor: {status_res}"
-                status = status_res.get("status")
-                
-                current_p = min(89, 50 + (i * 0.3))
-                self._update_view(a_pc=int(current_p), a_m=f"Renderizando Autônomo ({status})...")
-                
-                if status == "completed":
-                    self._update_view(a_pc=90, a_m="Baixando Vídeo...")
-                    local_path = self.engine.download_result(job_id)
-                    self._update_view(a_pc=100, a_m="Sucesso Absoluto!")
-                    return f"Sucesso! Vídeo final baixado em: {local_path}"
-                elif status in ("failed", "error"):
-                    return f"ERRO: Renderização falhou na GPU: {status_res.get('error')}"
-                elif status == "not_found":
-                    return "ERRO: Job desapareceu da GPU (crash de memória?)."
-            return "ERRO: Timeout após 30 minutos aguardando GPU."
-        except Exception as e:
-            return f"ERRO no polling: {str(e)}"
-
-    # --- ENTRADA DO PIPELINE ---
+            raise e
 
     def produce_video_from_text(self, text: str, job_id=None, index=1, total=1, force_gpu="ALL", webhook_url=None):
-        """Pipeline visual acionado pelo Cérebro Agno."""
+        """Pipeline visual estabilizado."""
         if job_id is None:
             import uuid
             job_id = uuid.uuid4().hex[:8]
             
-        print(f"\n[JOB {job_id[:8]}] >>> INICIANDO PRODUÇÃO COGNITIVA (AGNO) <<<")
-        print("\n" * 3) # Espaço para as 3 barras
-        
-        # Reset visual
-        self._update_view(0, 0, 0, "Aguardando Orquestrador...", "Aguardando...", "Aguardando...")
+        print(f"\n[JOB {job_id[:8]}] >>> INICIANDO PRODUÇÃO LINEAR <<<")
+        self._update_view(0, 0, 0, "Iniciando Orquestração...", "Aguardando...", "Aguardando...")
         
         try:
-            prompt = f"Produza um vídeo para o texto '{text}'. O Job ID é '{job_id}'. "
+            prompt = f"Produza um vídeo para o texto '{text}'. O Job ID é '{job_id}'."
             if webhook_url:
-                prompt += f"Passe o webhook_url '{webhook_url}' para o dispatch_render_job."
+                prompt += f" Passe o webhook_url '{webhook_url}'."
                 
             run_response = self.agent.run(prompt)
             resposta = run_response.content
             
-            print(f"\n[AGNO MAESTRO] Relatório de Missão:\n{resposta}")
-            
             if "SUCESSO" in resposta.upper():
-                return {"status": "success", "video_path": "Assíncrono (Será via Webhook)"}
+                return {"status": "success", "job_id": job_id, "video_path": "Processando na GPU..."}
             else:
-                self._update_view(err=True, a_m="Agente abortou por falha irrecuperável.")
                 return {"status": "error", "message": resposta}
                 
         except Exception as e:
-            error_msg = str(e)[:100]
-            self._update_view(err=True, a_m=f"FALHA FATAL DO AGENTE: {error_msg}")
-            return {"status": "error", "message": str(e)}
+            error_msg = str(e)
+            print(f"[ERROR] Falha Fatal: {error_msg}")
+            self._update_view(err=True, a_m=f"FALHA: {error_msg}")
+            return {"status": "error", "message": error_msg}
 
 if __name__ == "__main__":
     maestro = AgenteLanaOrchestrator()

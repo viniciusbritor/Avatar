@@ -19,6 +19,7 @@
 
 # Liberar: config do build
 !cloudbuild.yaml
+!requirements.txt
 
 # Excluir cache Python e outputs
 __pycache__/

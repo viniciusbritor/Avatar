@@ -1,0 +1,11 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['pull', 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.9']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['tag', 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.9', 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4-v2.9:latest']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['tag', 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.9', 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4-v2.9:v2.9']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4-v2.9:latest']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4-v2.9:v2.9']

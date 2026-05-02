@@ -1,0 +1,499 @@
+ï»¿2026-04-30T17:35:00.8139651Z Current runner version: '2.334.0'
+2026-04-30T17:35:00.8162045Z ##[group]Runner Image Provisioner
+2026-04-30T17:35:00.8163233Z Hosted Compute Agent
+2026-04-30T17:35:00.8163878Z Version: 20260213.493
+2026-04-30T17:35:00.8164630Z Commit: 5c115507f6dd24b8de37d8bbe0bb4509d0cc0fa3
+2026-04-30T17:35:00.8165384Z Build Date: 2026-02-13T00:28:41Z
+2026-04-30T17:35:00.8166458Z Worker ID: ***e9a63fc0-96de-48bb-b924-1d5919c78bd3***
+2026-04-30T17:35:00.8167256Z Azure Region: westcentralus
+2026-04-30T17:35:00.8167993Z ##[endgroup]
+2026-04-30T17:35:00.8169292Z ##[group]Operating System
+2026-04-30T17:35:00.8170004Z Ubuntu
+2026-04-30T17:35:00.8170586Z 24.04.4
+2026-04-30T17:35:00.8171219Z LTS
+2026-04-30T17:35:00.8171783Z ##[endgroup]
+2026-04-30T17:35:00.8172411Z ##[group]Runner Image
+2026-04-30T17:35:00.8173038Z Image: ubuntu-24.04
+2026-04-30T17:35:00.8173710Z Version: 20260413.86.1
+2026-04-30T17:35:00.8174871Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260413.86/images/ubuntu/Ubuntu2404-Readme.md
+2026-04-30T17:35:00.8176538Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260413.86
+2026-04-30T17:35:00.8177518Z ##[endgroup]
+2026-04-30T17:35:00.8178718Z ##[group]GITHUB_TOKEN Permissions
+2026-04-30T17:35:00.8180641Z Contents: read
+2026-04-30T17:35:00.8181266Z Metadata: read
+2026-04-30T17:35:00.8181929Z Packages: read
+2026-04-30T17:35:00.8182488Z ##[endgroup]
+2026-04-30T17:35:00.8184462Z Secret source: Actions
+2026-04-30T17:35:00.8185254Z Prepare workflow directory
+2026-04-30T17:35:00.8492977Z Prepare all required actions
+2026-04-30T17:35:00.8523591Z Getting action download info
+2026-04-30T17:35:01.3097148Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-04-30T17:35:01.5836299Z Download action repository 'google-github-actions/auth@v2' (SHA:c200f3691d83b41bf9bbd8638997a462592937ed)
+2026-04-30T17:35:02.2956853Z Download action repository 'google-github-actions/setup-gcloud@v2' (SHA:e427ad8a34f8676edf47cf7d7925499adf3eb74f)
+2026-04-30T17:35:02.9294373Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+2026-04-30T17:35:03.1536708Z Complete job name: Produzir Avatar
+2026-04-30T17:35:03.3324772Z ##[group]Run actions/checkout@v4
+2026-04-30T17:35:03.3326227Z with:
+2026-04-30T17:35:03.3327225Z   ref: master
+2026-04-30T17:35:03.3328344Z   repository: viniciusbritor/Avatar
+2026-04-30T17:35:03.3329678Z   token: ***
+2026-04-30T17:35:03.3330491Z   ssh-strict: true
+2026-04-30T17:35:03.3331344Z   ssh-user: git
+2026-04-30T17:35:03.3332221Z   persist-credentials: true
+2026-04-30T17:35:03.3333155Z   clean: true
+2026-04-30T17:35:03.3334043Z   sparse-checkout-cone-mode: true
+2026-04-30T17:35:03.3335068Z   fetch-depth: 1
+2026-04-30T17:35:03.3336072Z   fetch-tags: false
+2026-04-30T17:35:03.3336936Z   show-progress: true
+2026-04-30T17:35:03.3337811Z   lfs: false
+2026-04-30T17:35:03.3338623Z   submodules: false
+2026-04-30T17:35:03.3339500Z   set-safe-directory: true
+2026-04-30T17:35:03.3340682Z ##[endgroup]
+2026-04-30T17:35:03.4291489Z Syncing repository: viniciusbritor/Avatar
+2026-04-30T17:35:03.4293869Z ##[group]Getting Git version info
+2026-04-30T17:35:03.4295174Z Working directory is '/home/runner/work/Avatar/Avatar'
+2026-04-30T17:35:03.4297281Z [command]/usr/bin/git version
+2026-04-30T17:35:03.4649190Z git version 2.53.0
+2026-04-30T17:35:03.4669000Z ##[endgroup]
+2026-04-30T17:35:03.4680858Z Temporarily overriding HOME='/home/runner/work/_temp/fb0e2a94-774b-487c-a8aa-6f892e92d7bb' before making global git config changes
+2026-04-30T17:35:03.4683332Z Adding repository directory to the temporary git global config as a safe directory
+2026-04-30T17:35:03.4692107Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Avatar/Avatar
+2026-04-30T17:35:03.4837535Z Deleting the contents of '/home/runner/work/Avatar/Avatar'
+2026-04-30T17:35:03.4840717Z ##[group]Initializing the repository
+2026-04-30T17:35:03.4844451Z [command]/usr/bin/git init /home/runner/work/Avatar/Avatar
+2026-04-30T17:35:03.7140686Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-04-30T17:35:03.7141620Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-04-30T17:35:03.7142376Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-04-30T17:35:03.7142979Z hint: call:
+2026-04-30T17:35:03.7143351Z hint:
+2026-04-30T17:35:03.7143838Z hint: 	git config --global init.defaultBranch <name>
+2026-04-30T17:35:03.7144390Z hint:
+2026-04-30T17:35:03.7144901Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-04-30T17:35:03.7145858Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-04-30T17:35:03.7146468Z hint:
+2026-04-30T17:35:03.7146856Z hint: 	git branch -m <name>
+2026-04-30T17:35:03.7147271Z hint:
+2026-04-30T17:35:03.7147820Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-04-30T17:35:03.7148595Z Initialized empty Git repository in /home/runner/work/Avatar/Avatar/.git/
+2026-04-30T17:35:03.7156243Z [command]/usr/bin/git remote add origin https://github.com/viniciusbritor/Avatar
+2026-04-30T17:35:03.7323509Z ##[endgroup]
+2026-04-30T17:35:03.7324274Z ##[group]Disabling automatic garbage collection
+2026-04-30T17:35:03.7327879Z [command]/usr/bin/git config --local gc.auto 0
+2026-04-30T17:35:03.7424079Z ##[endgroup]
+2026-04-30T17:35:03.7424755Z ##[group]Setting up auth
+2026-04-30T17:35:03.7429782Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-04-30T17:35:03.7454351Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-04-30T17:35:03.9952082Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-04-30T17:35:03.9977093Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-04-30T17:35:04.0163075Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-04-30T17:35:04.0188430Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-04-30T17:35:04.0381059Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-04-30T17:35:04.0514832Z ##[endgroup]
+2026-04-30T17:35:04.0515739Z ##[group]Fetching the repository
+2026-04-30T17:35:04.0522568Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +refs/heads/master*:refs/remotes/origin/master* +refs/tags/master*:refs/tags/master*
+2026-04-30T17:35:04.9538155Z From https://github.com/viniciusbritor/Avatar
+2026-04-30T17:35:04.9539362Z  * [new branch]      master     -> origin/master
+2026-04-30T17:35:04.9562419Z ##[endgroup]
+2026-04-30T17:35:04.9563061Z ##[group]Determining the checkout info
+2026-04-30T17:35:04.9569343Z [command]/usr/bin/git branch --list --remote origin/master
+2026-04-30T17:35:04.9589418Z   origin/master
+2026-04-30T17:35:04.9593415Z ##[endgroup]
+2026-04-30T17:35:04.9598042Z [command]/usr/bin/git sparse-checkout disable
+2026-04-30T17:35:05.3118398Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-04-30T17:35:05.3207314Z ##[group]Checking out the ref
+2026-04-30T17:35:05.3210902Z [command]/usr/bin/git checkout --progress --force -B master refs/remotes/origin/master
+2026-04-30T17:35:05.5029627Z Reset branch 'master'
+2026-04-30T17:35:05.5030515Z branch 'master' set up to track 'origin/master'.
+2026-04-30T17:35:05.5037406Z ##[endgroup]
+2026-04-30T17:35:05.5072382Z [command]/usr/bin/git log -1 --format=%H
+2026-04-30T17:35:05.5091662Z a9635a91025d6cd272eb53b3fbad0b187d8cf303
+2026-04-30T17:35:05.5429983Z ##[group]Run google-github-actions/auth@v2
+2026-04-30T17:35:05.5430288Z with:
+2026-04-30T17:35:05.5437695Z   credentials_json: ***
+2026-04-30T17:35:05.5437959Z   create_credentials_file: true
+2026-04-30T17:35:05.5438230Z   export_environment_variables: true
+2026-04-30T17:35:05.5438503Z   universe: googleapis.com
+2026-04-30T17:35:05.5438747Z   cleanup_credentials: true
+2026-04-30T17:35:05.5438992Z   access_token_lifetime: 3600s
+2026-04-30T17:35:05.5439327Z   access_token_scopes: https://www.googleapis.com/auth/cloud-platform
+2026-04-30T17:35:05.5439684Z   id_token_include_email: false
+2026-04-30T17:35:05.5439928Z ##[endgroup]
+2026-04-30T17:35:05.6819121Z Created credentials file at "/home/runner/work/Avatar/Avatar/gha-creds-90f4c6858402aa92.json"
+2026-04-30T17:35:05.7008546Z ##[group]Run google-github-actions/setup-gcloud@v2
+2026-04-30T17:35:05.7008934Z with:
+2026-04-30T17:35:05.7009221Z   project_id: brasili-ia-news
+2026-04-30T17:35:05.7009507Z   version: latest
+2026-04-30T17:35:05.7009754Z   skip_install: false
+2026-04-30T17:35:05.7010012Z   skip_tool_cache: false
+2026-04-30T17:35:05.7010283Z env:
+2026-04-30T17:35:05.7010697Z   CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE: /home/runner/work/Avatar/Avatar/gha-creds-90f4c6858402aa92.json
+2026-04-30T17:35:05.7011352Z   GOOGLE_APPLICATION_CREDENTIALS: /home/runner/work/Avatar/Avatar/gha-creds-90f4c6858402aa92.json
+2026-04-30T17:35:05.7011943Z   GOOGLE_GHA_CREDS_PATH: /home/runner/work/Avatar/Avatar/gha-creds-90f4c6858402aa92.json
+2026-04-30T17:35:05.7012408Z   CLOUDSDK_CORE_PROJECT: brasili-ia-news
+2026-04-30T17:35:05.7012726Z   CLOUDSDK_PROJECT: brasili-ia-news
+2026-04-30T17:35:05.7013031Z   GCLOUD_PROJECT: brasili-ia-news
+2026-04-30T17:35:05.7013323Z   GCP_PROJECT: brasili-ia-news
+2026-04-30T17:35:05.7013644Z   GOOGLE_CLOUD_PROJECT: brasili-ia-news
+2026-04-30T17:35:05.7013940Z ##[endgroup]
+2026-04-30T17:35:06.7946258Z [command]/usr/bin/tar xz --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/765cad9e-b20e-4b22-852b-30de2decf02f -f /home/runner/work/_temp/b50458fe-695e-411a-b373-4b81a6cf60df
+2026-04-30T17:35:37.9925792Z Successfully authenticated
+2026-04-30T17:35:38.9437669Z Successfully set default project
+2026-04-30T17:35:38.9634899Z ##[group]Run actions/setup-python@v5
+2026-04-30T17:35:38.9635181Z with:
+2026-04-30T17:35:38.9635393Z   python-version: 3.10
+2026-04-30T17:35:38.9635821Z   check-latest: false
+2026-04-30T17:35:38.9636157Z   token: ***
+2026-04-30T17:35:38.9636375Z   update-environment: true
+2026-04-30T17:35:38.9636623Z   allow-prereleases: false
+2026-04-30T17:35:38.9636853Z   freethreaded: false
+2026-04-30T17:35:38.9637068Z env:
+2026-04-30T17:35:38.9637446Z   CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE: /home/runner/work/Avatar/Avatar/gha-creds-90f4c6858402aa92.json
+2026-04-30T17:35:38.9638027Z   GOOGLE_APPLICATION_CREDENTIALS: /home/runner/work/Avatar/Avatar/gha-creds-90f4c6858402aa92.json
+2026-04-30T17:35:38.9638539Z   GOOGLE_GHA_CREDS_PATH: /home/runner/work/Avatar/Avatar/gha-creds-90f4c6858402aa92.json
+2026-04-30T17:35:38.9638940Z   CLOUDSDK_CORE_PROJECT: brasili-ia-news
+2026-04-30T17:35:38.9639228Z   CLOUDSDK_PROJECT: brasili-ia-news
+2026-04-30T17:35:38.9639522Z   GCLOUD_PROJECT: brasili-ia-news
+2026-04-30T17:35:38.9639807Z   GCP_PROJECT: brasili-ia-news
+2026-04-30T17:35:38.9657839Z   GOOGLE_CLOUD_PROJECT: brasili-ia-news
+2026-04-30T17:35:38.9658322Z   CLOUDSDK_METRICS_ENVIRONMENT: github-actions-setup-gcloud
+2026-04-30T17:35:38.9658796Z   CLOUDSDK_METRICS_ENVIRONMENT_VERSION: 2.2.1
+2026-04-30T17:35:38.9659168Z ##[endgroup]
+2026-04-30T17:35:39.0995936Z ##[group]Installed versions
+2026-04-30T17:35:39.1079703Z Successfully set up CPython (3.10.20)
+2026-04-30T17:35:39.1080309Z ##[endgroup]
+2026-04-30T17:35:39.1850927Z ##[group]Run python -m pip install --upgrade pip
+2026-04-30T17:35:39.1851344Z [36;1mpython -m pip install --upgrade pip[0m
+2026-04-30T17:35:39.1851763Z [36;1mpip install agno google-genai google-cloud-storage requests python-dotenv[0m
+2026-04-30T17:35:39.2570876Z shell: /usr/bin/bash -e ***0***
+2026-04-30T17:35:39.2571188Z env:
+2026-04-30T17:35:39.2571594Z   CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE: /home/runner/work/Avatar/Avatar/gha-creds-90f4c6858402aa92.json
+2026-04-30T17:35:39.2572433Z   GOOGLE_APPLICATION_CREDENTIALS: /home/runner/work/Avatar/Avatar/gha-creds-90f4c6858402aa92.json
+2026-04-30T17:35:39.2572949Z   GOOGLE_GHA_CREDS_PATH: /home/runner/work/Avatar/Avatar/gha-creds-90f4c6858402aa92.json
+2026-04-30T17:35:39.2573352Z   CLOUDSDK_CORE_PROJECT: brasili-ia-news
+2026-04-30T17:35:39.2573637Z   CLOUDSDK_PROJECT: brasili-ia-news
+2026-04-30T17:35:39.2573903Z   GCLOUD_PROJECT: brasili-ia-news
+2026-04-30T17:35:39.2574167Z   GCP_PROJECT: brasili-ia-news
+2026-04-30T17:35:39.2574498Z   GOOGLE_CLOUD_PROJECT: brasili-ia-news
+2026-04-30T17:35:39.2574837Z   CLOUDSDK_METRICS_ENVIRONMENT: github-actions-setup-gcloud
+2026-04-30T17:35:39.2575177Z   CLOUDSDK_METRICS_ENVIRONMENT_VERSION: 2.2.1
+2026-04-30T17:35:39.2575507Z   pythonLocation: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-04-30T17:35:39.2576061Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib/pkgconfig
+2026-04-30T17:35:39.2576445Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-04-30T17:35:39.2576796Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-04-30T17:35:39.2577140Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-04-30T17:35:39.2577491Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib
+2026-04-30T17:35:39.2577796Z ##[endgroup]
+2026-04-30T17:35:40.7784524Z Requirement already satisfied: pip in /opt/hostedtoolcache/Python/3.10.20/x64/lib/python3.10/site-packages (26.0.1)
+2026-04-30T17:35:40.9064725Z Collecting pip
+2026-04-30T17:35:40.9976540Z   Downloading pip-26.1-py3-none-any.whl.metadata (4.6 kB)
+2026-04-30T17:35:41.0299314Z Downloading pip-26.1-py3-none-any.whl (1.8 MB)
+2026-04-30T17:35:41.1790980Z    ââââââââââââââââââââââââââââââââââââââââ 1.8/1.8 MB 16.3 MB/s  0:00:00
+2026-04-30T17:35:41.1990281Z Installing collected packages: pip
+2026-04-30T17:35:41.1991223Z   Attempting uninstall: pip
+2026-04-30T17:35:41.1996462Z     Found existing installation: pip 26.0.1
+2026-04-30T17:35:41.2414719Z     Uninstalling pip-26.0.1:
+2026-04-30T17:35:41.2468290Z       Successfully uninstalled pip-26.0.1
+2026-04-30T17:35:41.9205729Z Successfully installed pip-26.1
+2026-04-30T17:35:42.4556715Z Collecting agno
+2026-04-30T17:35:42.5505368Z   Downloading agno-2.6.4-py3-none-any.whl.metadata (40 kB)
+2026-04-30T17:35:42.8420428Z Collecting google-genai
+2026-04-30T17:35:42.8610441Z   Downloading google_genai-1.74.0-py3-none-any.whl.metadata (52 kB)
+2026-04-30T17:35:42.9100671Z Collecting google-cloud-storage
+2026-04-30T17:35:42.9293267Z   Downloading google_cloud_storage-3.10.1-py3-none-any.whl.metadata (15 kB)
+2026-04-30T17:35:42.9745967Z Collecting requests
+2026-04-30T17:35:42.9941411Z   Downloading requests-2.33.1-py3-none-any.whl.metadata (4.8 kB)
+2026-04-30T17:35:43.0251536Z Collecting python-dotenv
+2026-04-30T17:35:43.0444114Z   Downloading python_dotenv-1.2.2-py3-none-any.whl.metadata (27 kB)
+2026-04-30T17:35:43.0724045Z Collecting docstring-parser (from agno)
+2026-04-30T17:35:43.0914320Z   Downloading docstring_parser-0.18.0-py3-none-any.whl.metadata (3.5 kB)
+2026-04-30T17:35:43.3589271Z Collecting gitpython (from agno)
+2026-04-30T17:35:43.3781858Z   Downloading gitpython-3.1.49-py3-none-any.whl.metadata (14 kB)
+2026-04-30T17:35:43.4610838Z Collecting h11>=0.16.0 (from agno)
+2026-04-30T17:35:43.4803591Z   Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+2026-04-30T17:35:43.5468493Z Collecting httpx[http2] (from agno)
+2026-04-30T17:35:43.5659689Z   Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+2026-04-30T17:35:43.6540857Z Collecting packaging (from agno)
+2026-04-30T17:35:43.6732118Z   Downloading packaging-26.2-py3-none-any.whl.metadata (3.5 kB)
+2026-04-30T17:35:43.7739808Z Collecting pydantic-settings (from agno)
+2026-04-30T17:35:43.7932899Z   Downloading pydantic_settings-2.14.0-py3-none-any.whl.metadata (3.4 kB)
+2026-04-30T17:35:44.0073046Z Collecting pydantic (from agno)
+2026-04-30T17:35:44.0264113Z   Downloading pydantic-2.13.3-py3-none-any.whl.metadata (108 kB)
+2026-04-30T17:35:44.0827797Z Collecting python-multipart (from agno)
+2026-04-30T17:35:44.1044599Z   Downloading python_multipart-0.0.27-py3-none-any.whl.metadata (2.1 kB)
+2026-04-30T17:35:44.3635702Z Collecting pyyaml (from agno)
+2026-04-30T17:35:44.3827398Z   Downloading pyyaml-6.0.3-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+2026-04-30T17:35:44.4293273Z Collecting rich (from agno)
+2026-04-30T17:35:44.4483981Z   Downloading rich-15.0.0-py3-none-any.whl.metadata (18 kB)
+2026-04-30T17:35:44.4810175Z Collecting typer (from agno)
+2026-04-30T17:35:44.4998837Z   Downloading typer-0.25.0-py3-none-any.whl.metadata (15 kB)
+2026-04-30T17:35:44.5304998Z Collecting typing-extensions (from agno)
+2026-04-30T17:35:44.5496660Z   Downloading typing_extensions-4.15.0-py3-none-any.whl.metadata (3.3 kB)
+2026-04-30T17:35:44.5802654Z Collecting anyio<5.0.0,>=4.8.0 (from google-genai)
+2026-04-30T17:35:44.5998550Z   Downloading anyio-4.13.0-py3-none-any.whl.metadata (4.5 kB)
+2026-04-30T17:35:44.6406145Z Collecting google-auth<3.0.0,>=2.48.1 (from google-auth[requests]<3.0.0,>=2.48.1->google-genai)
+2026-04-30T17:35:44.6600462Z   Downloading google_auth-2.49.2-py3-none-any.whl.metadata (6.2 kB)
+2026-04-30T17:35:44.7022936Z Collecting tenacity<9.2.0,>=8.2.3 (from google-genai)
+2026-04-30T17:35:44.7213940Z   Downloading tenacity-9.1.4-py3-none-any.whl.metadata (1.2 kB)
+2026-04-30T17:35:44.8271653Z Collecting websockets<17.0,>=13.0.0 (from google-genai)
+2026-04-30T17:35:44.8464216Z   Downloading websockets-16.0-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (6.8 kB)
+2026-04-30T17:35:44.8761968Z Collecting distro<2,>=1.7.0 (from google-genai)
+2026-04-30T17:35:44.8950665Z   Downloading distro-1.9.0-py3-none-any.whl.metadata (6.8 kB)
+2026-04-30T17:35:44.9268212Z Collecting sniffio (from google-genai)
+2026-04-30T17:35:44.9457609Z   Downloading sniffio-1.3.1-py3-none-any.whl.metadata (3.9 kB)
+2026-04-30T17:35:45.0399475Z Collecting charset_normalizer<4,>=2 (from requests)
+2026-04-30T17:35:45.0592597Z   Downloading charset_normalizer-3.4.7-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (40 kB)
+2026-04-30T17:35:45.0935766Z Collecting idna<4,>=2.5 (from requests)
+2026-04-30T17:35:45.1126307Z   Downloading idna-3.13-py3-none-any.whl.metadata (8.0 kB)
+2026-04-30T17:35:45.1466697Z Collecting urllib3<3,>=1.26 (from requests)
+2026-04-30T17:35:45.1657812Z   Downloading urllib3-2.6.3-py3-none-any.whl.metadata (6.9 kB)
+2026-04-30T17:35:45.1965220Z Collecting certifi>=2023.5.7 (from requests)
+2026-04-30T17:35:45.2156492Z   Downloading certifi-2026.4.22-py3-none-any.whl.metadata (2.5 kB)
+2026-04-30T17:35:45.2430702Z Collecting exceptiongroup>=1.0.2 (from anyio<5.0.0,>=4.8.0->google-genai)
+2026-04-30T17:35:45.2618802Z   Downloading exceptiongroup-1.3.1-py3-none-any.whl.metadata (6.7 kB)
+2026-04-30T17:35:45.2977179Z Collecting pyasn1-modules>=0.2.1 (from google-auth<3.0.0,>=2.48.1->google-auth[requests]<3.0.0,>=2.48.1->google-genai)
+2026-04-30T17:35:45.3168180Z   Downloading pyasn1_modules-0.4.2-py3-none-any.whl.metadata (3.5 kB)
+2026-04-30T17:35:45.4912901Z Collecting cryptography>=38.0.3 (from google-auth<3.0.0,>=2.48.1->google-auth[requests]<3.0.0,>=2.48.1->google-genai)
+2026-04-30T17:35:45.5105854Z   Downloading cryptography-47.0.0-cp38-abi3-manylinux_2_34_x86_64.whl.metadata (4.5 kB)
+2026-04-30T17:35:45.5442183Z Collecting httpcore==1.* (from httpx[http2]->agno)
+2026-04-30T17:35:45.5630845Z   Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+2026-04-30T17:35:45.6978165Z Collecting annotated-types>=0.6.0 (from pydantic->agno)
+2026-04-30T17:35:45.7164488Z   Downloading annotated_types-0.7.0-py3-none-any.whl.metadata (15 kB)
+2026-04-30T17:35:46.3165501Z Collecting pydantic-core==2.46.3 (from pydantic->agno)
+2026-04-30T17:35:46.3357258Z   Downloading pydantic_core-2.46.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.6 kB)
+2026-04-30T17:35:46.3696388Z Collecting typing-inspection>=0.4.2 (from pydantic->agno)
+2026-04-30T17:35:46.3884312Z   Downloading typing_inspection-0.4.2-py3-none-any.whl.metadata (2.6 kB)
+2026-04-30T17:35:46.4304905Z Collecting google-api-core<3.0.0,>=2.27.0 (from google-cloud-storage)
+2026-04-30T17:35:46.4492951Z   Downloading google_api_core-2.30.3-py3-none-any.whl.metadata (3.1 kB)
+2026-04-30T17:35:46.5158762Z Collecting google-cloud-core<3.0.0,>=2.4.2 (from google-cloud-storage)
+2026-04-30T17:35:46.5349135Z   Downloading google_cloud_core-2.5.1-py3-none-any.whl.metadata (2.8 kB)
+2026-04-30T17:35:46.5644018Z Collecting google-resumable-media<3.0.0,>=2.7.2 (from google-cloud-storage)
+2026-04-30T17:35:46.5833310Z   Downloading google_resumable_media-2.8.2-py3-none-any.whl.metadata (2.2 kB)
+2026-04-30T17:35:46.6500887Z Collecting google-crc32c<2.0.0,>=1.1.3 (from google-cloud-storage)
+2026-04-30T17:35:46.6692061Z   Downloading google_crc32c-1.8.0-cp310-cp310-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl.metadata (1.7 kB)
+2026-04-30T17:35:46.7047059Z Collecting googleapis-common-protos<2.0.0,>=1.63.2 (from google-api-core<3.0.0,>=2.27.0->google-cloud-storage)
+2026-04-30T17:35:46.7237822Z   Downloading googleapis_common_protos-1.74.0-py3-none-any.whl.metadata (9.2 kB)
+2026-04-30T17:35:46.8578488Z Collecting protobuf<8.0.0,>=4.25.8 (from google-api-core<3.0.0,>=2.27.0->google-cloud-storage)
+2026-04-30T17:35:46.8773709Z   Downloading protobuf-7.34.1-cp310-abi3-manylinux2014_x86_64.whl.metadata (595 bytes)
+2026-04-30T17:35:47.0276761Z Collecting proto-plus<2.0.0,>=1.22.3 (from google-api-core<3.0.0,>=2.27.0->google-cloud-storage)
+2026-04-30T17:35:47.0464011Z   Downloading proto_plus-1.27.2-py3-none-any.whl.metadata (2.2 kB)
+2026-04-30T17:35:47.1669836Z Collecting cffi>=2.0.0 (from cryptography>=38.0.3->google-auth<3.0.0,>=2.48.1->google-auth[requests]<3.0.0,>=2.48.1->google-genai)
+2026-04-30T17:35:47.1862386Z   Downloading cffi-2.0.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.6 kB)
+2026-04-30T17:35:47.2130796Z Collecting pycparser (from cffi>=2.0.0->cryptography>=38.0.3->google-auth<3.0.0,>=2.48.1->google-auth[requests]<3.0.0,>=2.48.1->google-genai)
+2026-04-30T17:35:47.2324816Z   Downloading pycparser-3.0-py3-none-any.whl.metadata (8.2 kB)
+2026-04-30T17:35:47.4931448Z Collecting pyasn1<0.7.0,>=0.6.1 (from pyasn1-modules>=0.2.1->google-auth<3.0.0,>=2.48.1->google-auth[requests]<3.0.0,>=2.48.1->google-genai)
+2026-04-30T17:35:47.5134975Z   Downloading pyasn1-0.6.3-py3-none-any.whl.metadata (8.4 kB)
+2026-04-30T17:35:47.5417573Z Collecting gitdb<5,>=4.0.1 (from gitpython->agno)
+2026-04-30T17:35:47.5604202Z   Downloading gitdb-4.0.12-py3-none-any.whl.metadata (1.2 kB)
+2026-04-30T17:35:47.5855846Z Collecting smmap<6,>=3.0.1 (from gitdb<5,>=4.0.1->gitpython->agno)
+2026-04-30T17:35:47.6078201Z   Downloading smmap-5.0.3-py3-none-any.whl.metadata (4.6 kB)
+2026-04-30T17:35:47.6369353Z Collecting h2<5,>=3 (from httpx[http2]->agno)
+2026-04-30T17:35:47.6557203Z   Downloading h2-4.3.0-py3-none-any.whl.metadata (5.1 kB)
+2026-04-30T17:35:47.8905227Z Collecting hyperframe<7,>=6.1 (from h2<5,>=3->httpx[http2]->agno)
+2026-04-30T17:35:47.9099354Z   Downloading hyperframe-6.1.0-py3-none-any.whl.metadata (4.3 kB)
+2026-04-30T17:35:47.9346868Z Collecting hpack<5,>=4.1 (from h2<5,>=3->httpx[http2]->agno)
+2026-04-30T17:35:47.9535760Z   Downloading hpack-4.1.0-py3-none-any.whl.metadata (4.6 kB)
+2026-04-30T17:35:48.2696711Z Collecting markdown-it-py>=2.2.0 (from rich->agno)
+2026-04-30T17:35:48.2891761Z   Downloading markdown_it_py-4.0.0-py3-none-any.whl.metadata (7.3 kB)
+2026-04-30T17:35:48.4267088Z Collecting pygments<3.0.0,>=2.13.0 (from rich->agno)
+2026-04-30T17:35:48.4457666Z   Downloading pygments-2.20.0-py3-none-any.whl.metadata (2.5 kB)
+2026-04-30T17:35:48.4713392Z Collecting mdurl~=0.1 (from markdown-it-py>=2.2.0->rich->agno)
+2026-04-30T17:35:48.4900674Z   Downloading mdurl-0.1.2-py3-none-any.whl.metadata (1.6 kB)
+2026-04-30T17:35:48.5206479Z Collecting click>=8.2.1 (from typer->agno)
+2026-04-30T17:35:48.5395788Z   Downloading click-8.3.3-py3-none-any.whl.metadata (2.6 kB)
+2026-04-30T17:35:48.5661213Z Collecting shellingham>=1.3.0 (from typer->agno)
+2026-04-30T17:35:48.5848880Z   Downloading shellingham-1.5.4-py2.py3-none-any.whl.metadata (3.5 kB)
+2026-04-30T17:35:48.6124155Z Collecting annotated-doc>=0.0.2 (from typer->agno)
+2026-04-30T17:35:48.6318877Z   Downloading annotated_doc-0.0.4-py3-none-any.whl.metadata (6.6 kB)
+2026-04-30T17:35:48.6973395Z Downloading agno-2.6.4-py3-none-any.whl (2.4 MB)
+2026-04-30T17:35:48.7991733Z    ââââââââââââââââââââââââââââââââââââââââ 2.4/2.4 MB 25.7 MB/s  0:00:00
+2026-04-30T17:35:48.8183394Z Downloading google_genai-1.74.0-py3-none-any.whl (790 kB)
+2026-04-30T17:35:48.8284704Z    ââââââââââââââââââââââââââââââââââââââââ 790.4/790.4 kB 73.3 MB/s  0:00:00
+2026-04-30T17:35:48.8476925Z Downloading requests-2.33.1-py3-none-any.whl (64 kB)
+2026-04-30T17:35:48.8720340Z Downloading anyio-4.13.0-py3-none-any.whl (114 kB)
+2026-04-30T17:35:48.8964457Z Downloading charset_normalizer-3.4.7-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (216 kB)
+2026-04-30T17:35:48.9187363Z Downloading distro-1.9.0-py3-none-any.whl (20 kB)
+2026-04-30T17:35:48.9429299Z Downloading google_auth-2.49.2-py3-none-any.whl (240 kB)
+2026-04-30T17:35:48.9642866Z Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+2026-04-30T17:35:48.9876091Z Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+2026-04-30T17:35:49.0091661Z Downloading idna-3.13-py3-none-any.whl (68 kB)
+2026-04-30T17:35:49.0302466Z Downloading pydantic-2.13.3-py3-none-any.whl (471 kB)
+2026-04-30T17:35:49.0534222Z Downloading pydantic_core-2.46.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.1 MB)
+2026-04-30T17:35:49.0874461Z    ââââââââââââââââââââââââââââââââââââââââ 2.1/2.1 MB 57.5 MB/s  0:00:00
+2026-04-30T17:35:49.1063544Z Downloading tenacity-9.1.4-py3-none-any.whl (28 kB)
+2026-04-30T17:35:49.1270953Z Downloading typing_extensions-4.15.0-py3-none-any.whl (44 kB)
+2026-04-30T17:35:49.1479954Z Downloading urllib3-2.6.3-py3-none-any.whl (131 kB)
+2026-04-30T17:35:49.1690822Z Downloading websockets-16.0-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (183 kB)
+2026-04-30T17:35:49.1901683Z Downloading google_cloud_storage-3.10.1-py3-none-any.whl (324 kB)
+2026-04-30T17:35:49.2117254Z Downloading google_api_core-2.30.3-py3-none-any.whl (173 kB)
+2026-04-30T17:35:49.2328850Z Downloading google_cloud_core-2.5.1-py3-none-any.whl (29 kB)
+2026-04-30T17:35:49.2537849Z Downloading google_crc32c-1.8.0-cp310-cp310-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl (33 kB)
+2026-04-30T17:35:49.2751584Z Downloading google_resumable_media-2.8.2-py3-none-any.whl (81 kB)
+2026-04-30T17:35:49.3000243Z Downloading googleapis_common_protos-1.74.0-py3-none-any.whl (300 kB)
+2026-04-30T17:35:49.3215255Z Downloading proto_plus-1.27.2-py3-none-any.whl (50 kB)
+2026-04-30T17:35:49.3426855Z Downloading protobuf-7.34.1-cp310-abi3-manylinux2014_x86_64.whl (324 kB)
+2026-04-30T17:35:49.3642426Z Downloading python_dotenv-1.2.2-py3-none-any.whl (22 kB)
+2026-04-30T17:35:49.3850917Z Downloading annotated_types-0.7.0-py3-none-any.whl (13 kB)
+2026-04-30T17:35:49.4058569Z Downloading certifi-2026.4.22-py3-none-any.whl (135 kB)
+2026-04-30T17:35:49.4410087Z Downloading cryptography-47.0.0-cp38-abi3-manylinux_2_34_x86_64.whl (4.7 MB)
+2026-04-30T17:35:49.4974759Z    ââââââââââââââââââââââââââââââââââââââââ 4.7/4.7 MB 81.5 MB/s  0:00:00
+2026-04-30T17:35:49.5166079Z Downloading cffi-2.0.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (216 kB)
+2026-04-30T17:35:49.5828874Z Downloading exceptiongroup-1.3.1-py3-none-any.whl (16 kB)
+2026-04-30T17:35:49.6035808Z Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+2026-04-30T17:35:49.6246483Z Downloading pyasn1_modules-0.4.2-py3-none-any.whl (181 kB)
+2026-04-30T17:35:49.6457571Z Downloading pyasn1-0.6.3-py3-none-any.whl (83 kB)
+2026-04-30T17:35:49.6666175Z Downloading typing_inspection-0.4.2-py3-none-any.whl (14 kB)
+2026-04-30T17:35:49.6874872Z Downloading docstring_parser-0.18.0-py3-none-any.whl (22 kB)
+2026-04-30T17:35:49.7089459Z Downloading gitpython-3.1.49-py3-none-any.whl (212 kB)
+2026-04-30T17:35:49.7319267Z Downloading gitdb-4.0.12-py3-none-any.whl (62 kB)
+2026-04-30T17:35:49.7528632Z Downloading smmap-5.0.3-py3-none-any.whl (24 kB)
+2026-04-30T17:35:49.7736499Z Downloading h2-4.3.0-py3-none-any.whl (61 kB)
+2026-04-30T17:35:49.7946091Z Downloading hpack-4.1.0-py3-none-any.whl (34 kB)
+2026-04-30T17:35:49.8261406Z Downloading hyperframe-6.1.0-py3-none-any.whl (13 kB)
+2026-04-30T17:35:49.8471390Z Downloading packaging-26.2-py3-none-any.whl (100 kB)
+2026-04-30T17:35:49.8738980Z Downloading pycparser-3.0-py3-none-any.whl (48 kB)
+2026-04-30T17:35:49.8961078Z Downloading pydantic_settings-2.14.0-py3-none-any.whl (60 kB)
+2026-04-30T17:35:49.9181176Z Downloading python_multipart-0.0.27-py3-none-any.whl (29 kB)
+2026-04-30T17:35:49.9394316Z Downloading pyyaml-6.0.3-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (770 kB)
+2026-04-30T17:35:49.9845050Z    ââââââââââââââââââââââââââââââââââââââââ 770.3/770.3 kB 11.8 MB/s  0:00:00
+2026-04-30T17:35:50.0033345Z Downloading rich-15.0.0-py3-none-any.whl (310 kB)
+2026-04-30T17:35:50.0250449Z Downloading pygments-2.20.0-py3-none-any.whl (1.2 MB)
+2026-04-30T17:35:50.0304077Z    ââââââââââââââââââââââââââââââââââââââââ 1.2/1.2 MB 279.9 MB/s  0:00:00
+2026-04-30T17:35:50.0492569Z Downloading markdown_it_py-4.0.0-py3-none-any.whl (87 kB)
+2026-04-30T17:35:50.0907368Z Downloading mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+2026-04-30T17:35:50.1117907Z Downloading sniffio-1.3.1-py3-none-any.whl (10 kB)
+2026-04-30T17:35:50.1323573Z Downloading typer-0.25.0-py3-none-any.whl (55 kB)
+2026-04-30T17:35:50.1530679Z Downloading annotated_doc-0.0.4-py3-none-any.whl (5.3 kB)
+2026-04-30T17:35:50.1738737Z Downloading click-8.3.3-py3-none-any.whl (110 kB)
+2026-04-30T17:35:50.1955711Z Downloading shellingham-1.5.4-py2.py3-none-any.whl (9.8 kB)
+2026-04-30T17:35:50.5229709Z Installing collected packages: websockets, urllib3, typing-extensions, tenacity, sniffio, smmap, shellingham, pyyaml, python-multipart, python-dotenv, pygments, pycparser, pyasn1, protobuf, packaging, mdurl, idna, hyperframe, hpack, h11, google-crc32c, docstring-parser, distro, click, charset_normalizer, certifi, annotated-types, annotated-doc, typing-inspection, requests, pydantic-core, pyasn1-modules, proto-plus, markdown-it-py, httpcore, h2, googleapis-common-protos, google-resumable-media, gitdb, exceptiongroup, cffi, rich, pydantic, gitpython, cryptography, anyio, typer, pydantic-settings, httpx, google-auth, google-api-core, google-genai, google-cloud-core, agno, google-cloud-storage
+2026-04-30T17:35:57.1243277Z 
+2026-04-30T17:35:57.1295115Z Successfully installed agno-2.6.4 annotated-doc-0.0.4 annotated-types-0.7.0 anyio-4.13.0 certifi-2026.4.22 cffi-2.0.0 charset_normalizer-3.4.7 click-8.3.3 cryptography-47.0.0 distro-1.9.0 docstring-parser-0.18.0 exceptiongroup-1.3.1 gitdb-4.0.12 gitpython-3.1.49 google-api-core-2.30.3 google-auth-2.49.2 google-cloud-core-2.5.1 google-cloud-storage-3.10.1 google-crc32c-1.8.0 google-genai-1.74.0 google-resumable-media-2.8.2 googleapis-common-protos-1.74.0 h11-0.16.0 h2-4.3.0 hpack-4.1.0 httpcore-1.0.9 httpx-0.28.1 hyperframe-6.1.0 idna-3.13 markdown-it-py-4.0.0 mdurl-0.1.2 packaging-26.2 proto-plus-1.27.2 protobuf-7.34.1 pyasn1-0.6.3 pyasn1-modules-0.4.2 pycparser-3.0 pydantic-2.13.3 pydantic-core-2.46.3 pydantic-settings-2.14.0 pygments-2.20.0 python-dotenv-1.2.2 python-multipart-0.0.27 pyyaml-6.0.3 requests-2.33.1 rich-15.0.0 shellingham-1.5.4 smmap-5.0.3 sniffio-1.3.1 tenacity-9.1.4 typer-0.25.0 typing-extensions-4.15.0 typing-inspection-0.4.2 urllib3-2.6.3 websockets-16.0
+2026-04-30T17:35:57.2759693Z ##[group]Run echo "ð¬ Iniciando produÃ§Ã£o do Avatar"
+2026-04-30T17:35:57.2760249Z [36;1mecho "ð¬ Iniciando produÃ§Ã£o do Avatar"[0m
+2026-04-30T17:35:57.2760701Z [36;1mecho "ð Texto: $AVATAR_TEXT"[0m
+2026-04-30T17:35:57.2761093Z [36;1mecho "ð Job ID: $JOB_ID"[0m
+2026-04-30T17:35:57.2761679Z [36;1mpython src/produce_requested_videos.py --text "$AVATAR_TEXT" --job-id "$JOB_ID"[0m
+2026-04-30T17:35:57.2786096Z shell: /usr/bin/bash -e ***0***
+2026-04-30T17:35:57.2786355Z env:
+2026-04-30T17:35:57.2786744Z   CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE: /home/runner/work/Avatar/Avatar/gha-creds-90f4c6858402aa92.json
+2026-04-30T17:35:57.2787325Z   GOOGLE_APPLICATION_CREDENTIALS: /home/runner/work/Avatar/Avatar/gha-creds-90f4c6858402aa92.json
+2026-04-30T17:35:57.2787854Z   GOOGLE_GHA_CREDS_PATH: /home/runner/work/Avatar/Avatar/gha-creds-90f4c6858402aa92.json
+2026-04-30T17:35:57.2788247Z   CLOUDSDK_CORE_PROJECT: brasili-ia-news
+2026-04-30T17:35:57.2788562Z   CLOUDSDK_PROJECT: brasili-ia-news
+2026-04-30T17:35:57.2788825Z   GCLOUD_PROJECT: brasili-ia-news
+2026-04-30T17:35:57.2789078Z   GCP_PROJECT: brasili-ia-news
+2026-04-30T17:35:57.2789335Z   GOOGLE_CLOUD_PROJECT: brasili-ia-news
+2026-04-30T17:35:57.2789655Z   CLOUDSDK_METRICS_ENVIRONMENT: github-actions-setup-gcloud
+2026-04-30T17:35:57.2789986Z   CLOUDSDK_METRICS_ENVIRONMENT_VERSION: 2.2.1
+2026-04-30T17:35:57.2790318Z   pythonLocation: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-04-30T17:35:57.2790701Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib/pkgconfig
+2026-04-30T17:35:57.2791077Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-04-30T17:35:57.2791435Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-04-30T17:35:57.2791777Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-04-30T17:35:57.2792118Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib
+2026-04-30T17:35:57.2792420Z   ENVIRONMENT: cloud
+2026-04-30T17:35:57.2792731Z   AVATAR_TEXT: O avatar agora sera gerado com sucesso direto pelo terminal
+2026-04-30T17:35:57.2793063Z   JOB_ID: teste-v23
+2026-04-30T17:35:57.2793299Z   GCS_BUCKET: brasil-ai-avatars-vault
+2026-04-30T17:35:57.2793556Z   PYTHONPATH: .
+2026-04-30T17:35:57.2793768Z   GEMINI_API_KEY: 
+2026-04-30T17:35:57.2793981Z   GOOGLE_API_KEY: 
+2026-04-30T17:35:57.2794202Z ##[endgroup]
+2026-04-30T17:35:57.4762739Z ð¬ Iniciando produÃ§Ã£o do Avatar
+2026-04-30T17:35:57.4763455Z ð Texto: O avatar agora sera gerado com sucesso direto pelo terminal
+2026-04-30T17:35:57.4764009Z ð Job ID: teste-v23
+2026-04-30T17:35:59.6793889Z /opt/hostedtoolcache/Python/3.10.20/x64/lib/python3.10/site-packages/google/api_core/_python_version_support.py:273: FutureWarning: You are using a Python version (3.10.20) which Google will stop supporting in new releases of google.api_core once it reaches its end of life (2026-10-04). Please upgrade to the latest Python version, or at least Python 3.11, to continue receiving updates for google.api_core past that date.
+2026-04-30T17:35:59.6796200Z   warnings.warn(message, FutureWarning)
+2026-04-30T17:36:00.3633805Z    âï¸  [GCS] banco baixado: gs://brasil-ai-avatars-vault/brasil_ai.db
+2026-04-30T17:36:00.3634418Z --- [BRASIL AI] Job: teste-v23 ---
+2026-04-30T17:36:00.3635047Z --- [BRASIL AI] Texto: 'O avatar agora sera gerado com sucesso direto pelo terminal...' ---
+2026-04-30T17:36:00.3635951Z --- [BRASIL AI] Iniciando produÃ§Ã£o de 1 vÃ­deos ---
+2026-04-30T17:36:00.3636278Z 
+2026-04-30T17:36:00.3636577Z --- [VIDEO 1/1] Produzindo: 'O avatar agora sera gerado com sucesso direto pelo...' ---
+2026-04-30T17:36:00.3637033Z 
+2026-04-30T17:36:00.3637295Z [JOB 22cca60d] >>> INICIANDO PRODUÃÃO COGNITIVA (AGNO) <<<
+2026-04-30T17:36:00.3637585Z 
+2026-04-30T17:36:00.3637589Z 
+2026-04-30T17:36:00.3637593Z 
+2026-04-30T17:36:00.3637597Z 
+2026-04-30T17:36:00.3637738Z [F[F[F
+2026-04-30T17:36:00.3638356Z [INFRA ] |[94m[0mâââââââââââââââââââââââââ| 0% - Aguardando Orquestrador...                                
+2026-04-30T17:36:00.3638842Z 
+2026-04-30T17:36:00.3639574Z [DOCKER] |[94m[0mâââââââââââââââââââââââââ| 0% - Aguardando...                                             
+2026-04-30T17:36:00.3639984Z 
+2026-04-30T17:36:00.3640410Z [AVATAR] |[94m[0mâââââââââââââââââââââââââ| 0% - Aguardando...                                             
+2026-04-30T17:36:00.3866263Z ERROR    GOOGLE_API_KEY not set. Please set the GOOGLE_API_KEY environment      
+2026-04-30T17:36:00.3867393Z          variable.                                                              
+2026-04-30T17:36:00.3874057Z ERROR    Unknown error from Gemini API: No API key was provided. Please pass a  
+2026-04-30T17:36:00.3874812Z          valid API key. Learn how to create an API key at                       
+2026-04-30T17:36:00.3875502Z          https://ai.google.dev/gemini-api/docs/api-key.                         
+2026-04-30T17:36:00.3881675Z ERROR    Error in Agent run: No API key was provided. Please pass a valid API   
+2026-04-30T17:36:00.3882394Z          key. Learn how to create an API key at                                 
+2026-04-30T17:36:00.3883042Z          https://ai.google.dev/gemini-api/docs/api-key.                         
+2026-04-30T17:36:00.3883419Z 
+2026-04-30T17:36:00.3883783Z [AGNO MAESTRO] RelatÃ³rio de MissÃ£o:
+2026-04-30T17:36:00.3884437Z No API key was provided. Please pass a valid API key. Learn how to create an API key at https://ai.google.dev/gemini-api/docs/api-key.
+2026-04-30T17:36:00.3884961Z [F[F[F
+2026-04-30T17:36:00.3885400Z [INFRA ] |[91m[0mâââââââââââââââââââââââââ| 0% - Aguardando Orquestrador...                                
+2026-04-30T17:36:00.3885929Z 
+2026-04-30T17:36:00.3886212Z [DOCKER] |[91m[0mâââââââââââââââââââââââââ| 0% - Aguardando...                                             
+2026-04-30T17:36:00.3886482Z 
+2026-04-30T17:36:00.3895793Z [AVATAR] |[91m[0mâââââââââââââââââââââââââ| 0% - Agente abortou por falha irrecuperÃ¡vel.                   
+2026-04-30T17:36:00.4393180Z â Falha no VÃ­deo 1: No API key was provided. Please pass a valid API key. Learn how to create an API key at https://ai.google.dev/gemini-api/docs/api-key.
+2026-04-30T17:36:00.4393916Z 
+2026-04-30T17:36:00.4394150Z --- [FINALIZADO] Resumo da ProduÃ§Ã£o ---
+2026-04-30T17:36:00.4395126Z VÃ­deo 1: â ERRO - No API key was provided. Please pass a valid API key. Learn how to create an API key at https://ai.google.dev/gemini-api/docs/api-key.
+2026-04-30T17:36:00.4396025Z 
+2026-04-30T17:36:00.4396324Z [FINOPS] Encerrando mÃ¡quina para evitar custos ociosos...
+2026-04-30T17:36:00.5940874Z ##[group]Run if ls outputs/*.mp4 2>/dev/null; then
+2026-04-30T17:36:00.5941254Z [36;1mif ls outputs/*.mp4 2>/dev/null; then[0m
+2026-04-30T17:36:00.5941558Z [36;1m  TIMESTAMP=$(date +%Y%m%d_%H%M%S)[0m
+2026-04-30T17:36:00.5941844Z [36;1m  for f in outputs/*.mp4; do[0m
+2026-04-30T17:36:00.5942183Z [36;1m    NEW_NAME="outputs/$***JOB_ID***_$***TIMESTAMP***.mp4"[0m
+2026-04-30T17:36:00.5942644Z [36;1m    mv "$f" "$NEW_NAME"[0m
+2026-04-30T17:36:00.5942959Z [36;1m    echo "ð Renomeado: $f -> $NEW_NAME"[0m
+2026-04-30T17:36:00.5943250Z [36;1m  done[0m
+2026-04-30T17:36:00.5943577Z [36;1m  gsutil -m cp outputs/*.mp4 gs://brasil-ai-avatars-vault/outputs/[0m
+2026-04-30T17:36:00.5944050Z [36;1m  echo "â VÃ­deo enviado para gs://brasil-ai-avatars-vault/outputs/"[0m
+2026-04-30T17:36:00.5944408Z [36;1melse[0m
+2026-04-30T17:36:00.5944675Z [36;1m  echo "â ï¸ Nenhum vÃ­deo encontrado em outputs/"[0m
+2026-04-30T17:36:00.5944979Z [36;1mfi[0m
+2026-04-30T17:36:00.5963727Z shell: /usr/bin/bash -e ***0***
+2026-04-30T17:36:00.5963985Z env:
+2026-04-30T17:36:00.5964377Z   CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE: /home/runner/work/Avatar/Avatar/gha-creds-90f4c6858402aa92.json
+2026-04-30T17:36:00.5964957Z   GOOGLE_APPLICATION_CREDENTIALS: /home/runner/work/Avatar/Avatar/gha-creds-90f4c6858402aa92.json
+2026-04-30T17:36:00.5965468Z   GOOGLE_GHA_CREDS_PATH: /home/runner/work/Avatar/Avatar/gha-creds-90f4c6858402aa92.json
+2026-04-30T17:36:00.5966058Z   CLOUDSDK_CORE_PROJECT: brasili-ia-news
+2026-04-30T17:36:00.5966342Z   CLOUDSDK_PROJECT: brasili-ia-news
+2026-04-30T17:36:00.5966619Z   GCLOUD_PROJECT: brasili-ia-news
+2026-04-30T17:36:00.5966873Z   GCP_PROJECT: brasili-ia-news
+2026-04-30T17:36:00.5967133Z   GOOGLE_CLOUD_PROJECT: brasili-ia-news
+2026-04-30T17:36:00.5967461Z   CLOUDSDK_METRICS_ENVIRONMENT: github-actions-setup-gcloud
+2026-04-30T17:36:00.5967796Z   CLOUDSDK_METRICS_ENVIRONMENT_VERSION: 2.2.1
+2026-04-30T17:36:00.5968128Z   pythonLocation: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-04-30T17:36:00.5968740Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib/pkgconfig
+2026-04-30T17:36:00.5969128Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-04-30T17:36:00.5969481Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-04-30T17:36:00.5969825Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.10.20/x64
+2026-04-30T17:36:00.5970168Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.10.20/x64/lib
+2026-04-30T17:36:00.5970475Z ##[endgroup]
+2026-04-30T17:36:00.6020439Z â ï¸ Nenhum vÃ­deo encontrado em outputs/
+2026-04-30T17:36:00.6062145Z Post job cleanup.
+2026-04-30T17:36:00.7380863Z Post job cleanup.
+2026-04-30T17:36:00.8070826Z Removed exported credentials at "/home/runner/work/Avatar/Avatar/gha-creds-90f4c6858402aa92.json".
+2026-04-30T17:36:00.8160602Z Post job cleanup.
+2026-04-30T17:36:00.8956699Z [command]/usr/bin/git version
+2026-04-30T17:36:00.8986167Z git version 2.53.0
+2026-04-30T17:36:00.9018256Z Temporarily overriding HOME='/home/runner/work/_temp/dd3ce318-3494-42f5-8cd2-004ef5b1e2cf' before making global git config changes
+2026-04-30T17:36:00.9019247Z Adding repository directory to the temporary git global config as a safe directory
+2026-04-30T17:36:00.9022767Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Avatar/Avatar
+2026-04-30T17:36:00.9052174Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-04-30T17:36:00.9079612Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-04-30T17:36:00.9268163Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-04-30T17:36:00.9286512Z http.https://github.com/.extraheader
+2026-04-30T17:36:00.9296288Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-04-30T17:36:00.9320006Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-04-30T17:36:00.9501901Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-04-30T17:36:00.9526106Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-04-30T17:36:00.9804153Z Cleaning up orphan processes
+2026-04-30T17:36:01.0055342Z ##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/setup-python@v5, google-github-actions/auth@v2, google-github-actions/setup-gcloud@v2. Actions will be forced to run with Node.js 24 by default starting June 2nd, 2026. Node.js 20 will be removed from the runner on September 16th, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

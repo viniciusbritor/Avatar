@@ -118,8 +118,10 @@ async def produce(request: Request, payload: ProduceRequest, x_api_key: str = He
         "completed_at": None
     }
     
-    worker_url = str(request.base_url).rstrip('/') + "/internal/render-worker"
-    webhook_url = str(request.base_url).rstrip('/') + "/webhook/render-complete"
+    # Força HTTPS para evitar redirecionamentos que quebram o POST (405)
+    base_url = str(request.base_url).rstrip('/').replace("http://", "https://")
+    worker_url = f"{base_url}/internal/render-worker"
+    webhook_url = f"{base_url}/webhook/render-complete"
     task_payload = {"job_id": job_id, "text": payload.text, "webhook_url": webhook_url}
     
     from google.protobuf import duration_pb2

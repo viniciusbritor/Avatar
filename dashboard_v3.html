@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Brasil AI Avatar Pipeline - FinOps Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;400;700;800&amp;family=Inter:wght@300;400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "tertiary": "#fff5de",
+                    "outline-variant": "#3b494b",
+                    "primary-fixed-dim": "#00dbe9",
+                    "on-tertiary-container": "#715d00",
+                    "on-secondary-fixed-variant": "#005234",
+                    "on-primary-fixed": "#002022",
+                    "on-secondary-container": "#007149",
+                    "on-tertiary": "#3b2f00",
+                    "on-surface-variant": "#b9cacb",
+                    "tertiary-fixed": "#ffe179",
+                    "on-error": "#690005",
+                    "background": "#0f1418",
+                    "on-tertiary-fixed-variant": "#554500",
+                    "surface-bright": "#353a3e",
+                    "on-tertiary-fixed": "#231b00",
+                    "tertiary-fixed-dim": "#eac324",
+                    "surface-variant": "#30353a",
+                    "on-background": "#dfe3e9",
+                    "on-primary": "#00363a",
+                    "inverse-surface": "#dfe3e9",
+                    "on-primary-fixed-variant": "#004f54",
+                    "primary": "#dbfcff",
+                    "on-secondary-fixed": "#002112",
+                    "secondary-fixed-dim": "#00e297",
+                    "surface-tint": "#00dbe9",
+                    "secondary-fixed": "#4dffb2",
+                    "on-primary-container": "#006970",
+                    "error-container": "#93000a",
+                    "on-surface": "#dfe3e9",
+                    "primary-container": "#00f0ff",
+                    "surface-container-low": "#171c20",
+                    "error": "#ffb4ab",
+                    "surface-container-highest": "#30353a",
+                    "surface-container-high": "#262b2f",
+                    "outline": "#849495",
+                    "secondary": "#f4fff5",
+                    "primary-fixed": "#7df4ff",
+                    "tertiary-container": "#fed639",
+                    "surface-container-lowest": "#0a0f13",
+                    "inverse-primary": "#006970",
+                    "surface": "#0f1418",
+                    "surface-dim": "#0f1418",
+                    "on-error-container": "#ffdad6",
+                    "surface-container": "#1b2024",
+                    "inverse-on-surface": "#2c3135",
+                    "on-secondary": "#003822",
+                    "secondary-container": "#00ffab"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "display": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        }
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f1418; color: #dfe3e9; }
+        .font-headline { font-family: 'Manrope', sans-serif; }
+        .glass-panel {
+            background: rgba(27, 32, 36, 0.6);
+            backdrop-filter: blur(20px) saturate(150%);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .cyan-glow {
+            box-shadow: 0 0 40px rgba(0, 240, 255, 0.08);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-surface-dim selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-12 h-24 bg-[#0f1418]/80 backdrop-blur-xl border-b border-white/10 shadow-[0_20px_50px_rgba(0,240,255,0.05)]">
+<div class="flex items-center gap-8">
+<span class="text-xl font-black tracking-tighter text-white uppercase font-headline">Brasil AI Avatar Pipeline</span>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-slate-500 font-medium hover:text-cyan-300 transition-all duration-300" href="#">Overview</a>
+<a class="text-cyan-400 border-b-2 border-cyan-400 pb-1 font-bold" href="#">Costs</a>
+<a class="text-slate-500 font-medium hover:text-cyan-300 transition-all duration-300" href="#">Assets</a>
+<a class="text-slate-500 font-medium hover:text-cyan-300 transition-all duration-300" href="#">Governance</a>
+</nav>
+</div>
+<div class="flex items-center gap-6">
+<button class="material-symbols-outlined text-slate-400 hover:text-white transition-all">notifications</button>
+<button class="material-symbols-outlined text-slate-400 hover:text-white transition-all">settings</button>
+<div class="h-10 w-10 rounded-full bg-surface-container-highest overflow-hidden border border-white/10">
+<img alt="User Profile Avatar" data-alt="close-up portrait of a high-tech digital human avatar with neon accents and sharp lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-MP_Q4936mQ-uLgOJVquU0-Inya8uqFUKonYv4kGwGHqfXI6rZYlvOJ3aGdD-ZtauVUUuffIHP3jEYq0bi3vgZyLe9pcacoPwZEcw9_43QQhtAan74-qMuC4WZ851a6QM0CsMtPvkpa06TZg0g3EOcZcT8jjWPB6Vi68-HBObLAOkEXlWTUgmJKjLOENIfKqumb1CtZSdgp8RGXYpqV2OG-O36Z98N9cLAzn6a2e-JMsfH-PPFwgDAGABVipHvX583Cjp1fvYiXn5"/>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-64 bg-[#1b2024]/90 backdrop-blur-2xl flex flex-col py-8 z-40 hidden md:flex">
+<div class="px-8 mb-12">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-primary-container rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-container" style="font-variation-settings: 'FILL' 1;">memory</span>
+</div>
+<div>
+<h2 class="text-lg font-bold text-white font-headline">FINOPS</h2>
+<p class="text-[10px] uppercase tracking-widest text-slate-500 font-label">Ethereal Engine v2</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 flex flex-col">
+<a class="flex items-center gap-4 text-slate-400 px-6 py-4 hover:bg-white/10 hover:text-white transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="speed">speed</span>
+<span class="uppercase tracking-widest text-[10px] font-label">Efficiency</span>
+</a>
+<a class="flex items-center gap-4 bg-white/5 text-cyan-400 border-r-4 border-cyan-400 px-6 py-4" href="#">
+<span class="material-symbols-outlined" data-icon="trending_up">trending_up</span>
+<span class="uppercase tracking-widest text-[10px] font-label">Burn Rate</span>
+</a>
+<a class="flex items-center gap-4 text-slate-400 px-6 py-4 hover:bg-white/10 hover:text-white transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="memory">memory</span>
+<span class="uppercase tracking-widest text-[10px] font-label">Infrastructure</span>
+</a>
+<a class="flex items-center gap-4 text-slate-400 px-6 py-4 hover:bg-white/10 hover:text-white transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="auto_awesome">auto_awesome</span>
+<span class="uppercase tracking-widest text-[10px] font-label">Optimization</span>
+</a>
+</nav>
+<div class="px-6">
+<button class="w-full py-3 bg-white/5 border border-white/10 text-white rounded-lg text-xs uppercase tracking-widest font-bold hover:bg-white/10 transition-all">
+                Download Audit
+            </button>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-0 md:ml-64 pt-32 px-12 pb-24 min-h-screen">
+<!-- Hero Header -->
+<div class="mb-12 flex justify-between items-end">
+<div>
+<span class="text-secondary-container font-label uppercase tracking-[0.2em] text-xs font-bold px-3 py-1 bg-secondary-container/10 rounded-full inline-block mb-4">Zero Waste Architecture</span>
+<h1 class="text-6xl font-black font-headline text-white tracking-tighter leading-none">Efficiency <br/><span class="text-primary-container">Orchestrator</span></h1>
+</div>
+<div class="text-right">
+<p class="text-slate-500 font-label text-sm uppercase tracking-widest mb-1">Current Strategy</p>
+<p class="text-white font-headline text-2xl font-bold">15-MIN BURST PIPELINE</p>
+</div>
+</div>
+<!-- Bento Grid Metrics -->
+<div class="grid grid-cols-12 gap-6 mb-12">
+<!-- Main Cost Metric -->
+<div class="col-span-12 lg:col-span-5 glass-panel p-8 rounded-xl relative overflow-hidden cyan-glow">
+<div class="absolute top-0 right-0 p-8 opacity-10">
+<span class="material-symbols-outlined text-[120px]" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
+</div>
+<p class="text-slate-400 font-label uppercase tracking-widest text-xs mb-8">Total Spend (MTD)</p>
+<div class="flex items-baseline gap-2">
+<span class="text-7xl font-headline font-black text-white">$12.40</span>
+<span class="text-secondary-container font-bold text-sm tracking-widest">USD</span>
+</div>
+<div class="mt-8 flex items-center gap-3">
+<div class="flex-1 h-1 bg-white/5 rounded-full overflow-hidden">
+<div class="w-[2%] h-full bg-primary-container"></div>
+</div>
+<span class="text-[10px] font-label text-slate-500 uppercase tracking-tighter">0.8% of Monthly Budget</span>
+</div>
+</div>
+<!-- Efficiency Score -->
+<div class="col-span-12 md:col-span-6 lg:col-span-4 glass-panel p-8 rounded-xl flex flex-col justify-between">
+<div>
+<p class="text-slate-400 font-label uppercase tracking-widest text-xs mb-2">Efficiency Score</p>
+<div class="flex items-center gap-4">
+<span class="text-5xl font-headline font-black text-secondary-container">100%</span>
+<span class="material-symbols-outlined text-secondary-container" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+</div>
+<div class="bg-secondary-container/5 p-4 rounded-lg border border-secondary-container/20">
+<p class="text-secondary-container text-xs font-medium leading-relaxed">Infrastructure is optimized for on-demand production. Savings of 98% vs 24/7 operation.</p>
+</div>
+</div>
+<!-- Burn Rate -->
+<div class="col-span-12 md:col-span-6 lg:col-span-3 glass-panel p-8 rounded-xl border-l-4 border-primary-container">
+<p class="text-slate-400 font-label uppercase tracking-widest text-xs mb-8">Peak Burn Rate</p>
+<div class="mb-4">
+<span class="text-4xl font-headline font-bold text-white">$0.80</span>
+<span class="text-slate-500 text-sm ml-1">/ hr</span>
+</div>
+<div class="flex flex-wrap gap-2">
+<span class="bg-white/5 px-2 py-1 rounded text-[10px] text-primary-container font-bold border border-primary-container/20 uppercase tracking-widest">Active Bursts Only</span>
+<span class="bg-white/5 px-2 py-1 rounded text-[10px] text-slate-400 font-bold border border-white/5 uppercase tracking-widest">Idle = $0.00</span>
+</div>
+</div>
+</div><section class="glass-panel rounded-xl p-8 mb-12">
+<div class="flex justify-between items-center mb-6">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary-container">list_alt</span>
+<h3 class="font-headline font-bold text-lg text-white">Live Jobs Tracker <span class="text-xs font-label text-slate-500 ml-2 uppercase tracking-widest font-normal">Pipeline V3</span></h3>
+</div>
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-1.5 text-[10px] text-slate-500 uppercase font-bold tracking-widest"><span class="w-1.5 h-1.5 rounded-full bg-slate-600"></span> Queued</span>
+<span class="flex items-center gap-1.5 text-[10px] text-primary-container uppercase font-bold tracking-widest"><span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse shadow-[0_0_8px_#00F0FF]"></span> Rendering</span>
+<span class="flex items-center gap-1.5 text-[10px] text-secondary-container uppercase font-bold tracking-widest"><span class="w-1.5 h-1.5 rounded-full bg-secondary-container"></span> Completed</span>
+</div>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+<!-- Job 1: Queued -->
+<div class="bg-surface-container-low/40 border border-white/5 rounded-lg p-4 transition-all hover:bg-surface-container-high/40">
+<div class="flex justify-between items-start mb-3">
+<span class="text-[10px] font-label font-bold text-slate-500 uppercase tracking-widest">#AV-901</span>
+<span class="text-[8px] px-2 py-0.5 rounded bg-surface-variant text-on-surface-variant uppercase font-bold">Queued</span>
+</div>
+<p class="text-sm font-medium text-slate-400 mb-1">Motion Synthesis</p>
+<p class="text-[10px] text-slate-600">Waiting for compute resources...</p>
+</div>
+<!-- Job 2: Rendering -->
+<div class="bg-primary-container/5 border border-primary-container/20 rounded-lg p-4 relative overflow-hidden group">
+<div class="absolute top-0 left-0 w-1 h-full bg-primary-container shadow-[0_0_15px_#00F0FF]"></div>
+<div class="flex justify-between items-start mb-3">
+<span class="text-[10px] font-label font-bold text-primary-container uppercase tracking-widest">#AV-899</span>
+<span class="text-[8px] px-2 py-0.5 rounded bg-primary-container/20 text-primary-container uppercase font-bold animate-pulse">Rendering</span>
+</div>
+<p class="text-sm font-medium text-white mb-1">Neural Skinning</p>
+<div class="w-full bg-white/5 h-1.5 rounded-full mt-2">
+<div class="bg-primary-container h-full rounded-full w-2/3 shadow-[0_0_10px_#00F0FF]"></div>
+</div>
+</div>
+<!-- Job 3: Completed -->
+<div class="bg-secondary-container/5 border border-secondary-container/10 rounded-lg p-4">
+<div class="flex justify-between items-start mb-3">
+<span class="text-[10px] font-label font-bold text-secondary-container uppercase tracking-widest">#AV-898</span>
+<span class="text-[8px] px-2 py-0.5 rounded bg-secondary-container text-on-secondary uppercase font-bold">Completed</span>
+</div>
+<p class="text-sm font-medium text-white mb-1">Texture Mapping</p>
+<div class="flex items-center gap-1 text-[10px] text-secondary-container/80">
+<span class="material-symbols-outlined text-[12px]">check_circle</span>
+                Finalized in 4.2s
+            </div>
+</div>
+<!-- Job 4: Completed -->
+<div class="bg-secondary-container/5 border border-secondary-container/10 rounded-lg p-4">
+<div class="flex justify-between items-start mb-3">
+<span class="text-[10px] font-label font-bold text-secondary-container uppercase tracking-widest">#AV-897</span>
+<span class="text-[8px] px-2 py-0.5 rounded bg-secondary-container text-on-secondary uppercase font-bold">Completed</span>
+</div>
+<p class="text-sm font-medium text-white mb-1">Rigging V2</p>
+<div class="flex items-center gap-1 text-[10px] text-secondary-container/80">
+<span class="material-symbols-outlined text-[12px]">check_circle</span>
+                Finalized in 1.8s
+            </div>
+</div>
+</div>
+</section>
+<!-- Node Status Table Section -->
+<div class="glass-panel rounded-xl overflow-hidden mb-12">
+<div class="px-8 py-6 border-b border-white/5 flex justify-between items-center">
+<h3 class="font-headline font-bold text-lg text-white">Pipeline Compute Clusters</h3>
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-slate-500"></div>
+<span class="text-xs uppercase tracking-widest font-bold text-slate-500">ALL INSTANCES STOPPED</span>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead>
+<tr class="bg-surface-container-lowest/50 text-slate-500 font-label text-[10px] uppercase tracking-widest">
+<th class="px-8 py-4 font-semibold">Instance ID</th>
+<th class="px-8 py-4 font-semibold">Type</th>
+<th class="px-8 py-4 font-semibold">Region</th>
+<th class="px-8 py-4 font-semibold">Uptime (24h)</th>
+<th class="px-8 py-4 font-semibold">Status</th>
+<th class="px-8 py-4 font-semibold text-right">Cost Savings</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-white/5">
+<tr class="hover:bg-white/5 transition-all group">
+<td class="px-8 py-5 font-mono text-xs text-white">i-0a127f88e2</td>
+<td class="px-8 py-5 text-xs text-slate-300">g5.2xlarge (A10G)</td>
+<td class="px-8 py-5 text-xs text-slate-400 font-label">sa-east-1</td>
+<td class="px-8 py-5 text-xs text-slate-400">14m 12s</td>
+<td class="px-8 py-5">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 text-slate-400 text-[10px] font-bold uppercase tracking-widest border border-white/10">
+<span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span> IDLE
+                                </span>
+</td>
+<td class="px-8 py-5 text-right font-headline font-bold text-secondary-container">-$142.10</td>
+</tr>
+<tr class="hover:bg-white/5 transition-all group">
+<td class="px-8 py-5 font-mono text-xs text-white">i-0c992d11b5</td>
+<td class="px-8 py-5 text-xs text-slate-300">p4d.24xlarge</td>
+<td class="px-8 py-5 text-xs text-slate-400 font-label">sa-east-1</td>
+<td class="px-8 py-5 text-xs text-slate-400">0m 0s</td>
+<td class="px-8 py-5">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 text-slate-400 text-[10px] font-bold uppercase tracking-widest border border-white/10">
+<span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span> STOPPED
+                                </span>
+</td>
+<td class="px-8 py-5 text-right font-headline font-bold text-secondary-container">-$890.40</td>
+</tr>
+<tr class="hover:bg-white/5 transition-all group">
+<td class="px-8 py-5 font-mono text-xs text-white">i-0b553e12x4</td>
+<td class="px-8 py-5 text-xs text-slate-300">ml.p3.2xlarge</td>
+<td class="px-8 py-5 text-xs text-slate-400 font-label">sa-east-1</td>
+<td class="px-8 py-5 text-xs text-slate-400">22m 45s</td>
+<td class="px-8 py-5">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 text-slate-400 text-[10px] font-bold uppercase tracking-widest border border-white/10">
+<span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span> IDLE
+                                </span>
+</td>
+<td class="px-8 py-5 text-right font-headline font-bold text-secondary-container">-$64.20</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Analysis & Projection -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<div class="glass-panel p-8 rounded-xl">
+<h4 class="text-white font-headline font-bold mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container">insights</span>
+                    Burst Utilization Graph
+                </h4>
+<div class="h-48 w-full flex items-end gap-1 mb-4">
+<!-- Faux Bar Chart -->
+<div class="flex-1 bg-white/5 h-[10%] rounded-t-sm"></div>
+<div class="flex-1 bg-white/5 h-[8%] rounded-t-sm"></div>
+<div class="flex-1 bg-primary-container h-[90%] rounded-t-sm shadow-[0_0_20px_rgba(0,240,255,0.4)] relative group">
+<div class="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-white text-on-surface p-1 rounded text-[10px] font-bold">BURST</div>
+</div>
+<div class="flex-1 bg-white/5 h-[5%] rounded-t-sm"></div>
+<div class="flex-1 bg-white/5 h-[5%] rounded-t-sm"></div>
+<div class="flex-1 bg-white/5 h-[5%] rounded-t-sm"></div>
+<div class="flex-1 bg-white/5 h-[5%] rounded-t-sm"></div>
+<div class="flex-1 bg-primary-container h-[75%] rounded-t-sm shadow-[0_0_20px_rgba(0,240,255,0.3)]"></div>
+<div class="flex-1 bg-white/5 h-[5%] rounded-t-sm"></div>
+<div class="flex-1 bg-white/5 h-[5%] rounded-t-sm"></div>
+</div>
+<div class="flex justify-between text-[10px] font-label text-slate-500 uppercase tracking-widest">
+<span>00:00</span>
+<span>Last 24 Hours Production Cycle</span>
+<span>23:59</span>
+</div>
+</div>
+<div class="glass-panel p-8 rounded-xl flex flex-col">
+<h4 class="text-white font-headline font-bold mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary-container">auto_awesome</span>
+                    Optimization Forecast
+                </h4>
+<div class="flex-1 flex flex-col justify-center gap-6">
+<div class="flex items-center justify-between">
+<span class="text-slate-400 text-sm">Monthly Projected Spend</span>
+<span class="text-white font-headline font-bold text-xl">$24.80</span>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-slate-400 text-sm">Savings vs Baseline SaaS</span>
+<span class="text-secondary-container font-headline font-bold text-xl">-$1,120.00</span>
+</div>
+<div class="p-4 bg-white/5 rounded-lg flex items-center gap-4">
+<img alt="Engine Logo" class="w-10 h-10 rounded-lg" data-alt="abstract tech geometric shape with cyan and emerald light trails on obsidian black background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_IFuHvGLtzaKHISeKzXYAb0CD2DQvH6rEReyRB8aIAXby5A7G482iOaS3rpKnNYBpDy1QmrtAdP2YE2tOpKKgGO3_If7TPCfDk99lL1iyNh3kTIZRTCfoFEobWrBVJ-g9oDGPifW4DQ_xk9dhPZ8w_u_DNcqxp4_UbRiUKep5dvtuThzCkxXcigbwKGB5mhbcUpBnpcAHRxr-qyGsMJNAwObRm53TB_VK6AAtAcwbfZdjkV8tX_YZferH5dDKqiHddSiaTb9tJLd9"/>
+<div>
+<p class="text-xs text-white font-bold uppercase tracking-widest">Next Production Window</p>
+<p class="text-[10px] text-slate-500">Scheduled for 14:00 UTC (15m Burst)</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation for Mobile -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-background/95 backdrop-blur-xl border-t border-white/5 flex justify-around items-center py-4 z-50">
+<button class="flex flex-col items-center gap-1 text-slate-500">
+<span class="material-symbols-outlined">speed</span>
+<span class="text-[8px] uppercase tracking-widest font-bold">Metrics</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-cyan-400">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">trending_up</span>
+<span class="text-[8px] uppercase tracking-widest font-bold">Costs</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-500">
+<span class="material-symbols-outlined">memory</span>
+<span class="text-[8px] uppercase tracking-widest font-bold">Nodes</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-500">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[8px] uppercase tracking-widest font-bold">Config</span>
+</button>
+</nav>
+</body></html>
