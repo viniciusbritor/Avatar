@@ -1,0 +1,26 @@
+# ─── Brasil AI Avatar — Cloud Build: L4 Golden Image ────────────────────
+# Builder: builda a imagem golden UMA VEZ e congela.
+# Fonte: LatentSync via git submodule (todas deps declaradas).
+# Uso: gcloud builds submit --config=cloudbuild-l4-golden.yaml --region=us-east1
+
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden'
+      - '-f'
+      - 'infra/Dockerfile.avatar-l4-v2.10-golden'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden'
+
+images:
+  - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'

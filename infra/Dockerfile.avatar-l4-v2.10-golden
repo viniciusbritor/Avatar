@@ -1,0 +1,73 @@
+# ─── Brasil AI Avatar L4 — Dockerfile v2.10-golden ───────────────────────
+# Fonte canônica do LatentSync via git submodule (bytedance/LatentSync).
+# requirements.txt do LatentSync declara TODAS as deps com versões exatas.
+# Patches aplicados no build:
+#   1. decord==0.6.0 → eva-decord>=0.6.0 (decord abandonado)
+#   2. DeepCache==0.1.1 → git+https://github.com/horseee/DeepCache.git
+#
+# Layers:
+#   1. apt (sistema)
+#   2. pip (LatentSync requirements + API server)
+#   3. COPY (código + submodule)
+
+FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=America/Sao_Paulo
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/workspace/latentsync:/workspace/src
+
+# ═══════════════════════════════════════════════════════════════════════════
+# LAYER 1: Sistema
+# ═══════════════════════════════════════════════════════════════════════════
+RUN apt-get update && apt-get install -y \
+    software-properties-common \
+    python3.10 \
+    python3-pip \
+    python3.10-dev \
+    git wget curl \
+    ffmpeg \
+    libsndfile1 \
+    libavcodec-dev \
+    libsm6 libxext6 \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -s /usr/bin/python3.10 /usr/bin/python \
+    && pip3 install --no-cache-dir --upgrade pip
+
+# ═══════════════════════════════════════════════════════════════════════════
+# LAYER 2: Dependencies (LatentSync + API)
+# ═══════════════════════════════════════════════════════════════════════════
+COPY latentsync/requirements.txt /tmp/latentsync-requirements.txt
+
+RUN sed -i 's/decord==0.6.0/eva-decord>=0.6.0/' /tmp/latentsync-requirements.txt && \
+    sed -i 's/DeepCache==0.1.1/git+https:\/\/github.com\/horseee\/DeepCache.git/' /tmp/latentsync-requirements.txt && \
+    pip3 install --no-cache-dir -r /tmp/latentsync-requirements.txt && \
+    pip3 install --no-cache-dir \
+    fastapi==0.115.0 \
+    uvicorn==0.31.0 \
+    python-multipart==0.0.12 \
+    google-cloud-storage==2.18.2 \
+    google-cloud-firestore==2.18.0 \
+    requests==2.32.3 \
+    pydantic==2.7.4 \
+    python-dotenv==1.0.1 \
+    tqdm==4.66.5 \
+    && rm /tmp/latentsync-requirements.txt
+
+# ═══════════════════════════════════════════════════════════════════════════
+# LAYER 3: Código (última layer = rebuild instantâneo)
+# ═══════════════════════════════════════════════════════════════════════════
+WORKDIR /workspace
+RUN mkdir -p /workspace/src /workspace/outputs/temp /workspace/latentsync/assets \
+    && chmod -R 777 /workspace
+
+COPY latentsync/ /workspace/latentsync/
+COPY src/industrial_main.py /workspace/src/industrial_main.py
+COPY src/lipsync_pipeline.py /workspace/src/lipsync_pipeline.py
+COPY src/secrets_manager.py /workspace/src/secrets_manager.py
+
+LABEL project="Lana"
+LABEL tier="Industrial-Golden"
+LABEL version="v2.10-golden"

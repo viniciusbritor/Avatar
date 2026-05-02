@@ -13,6 +13,10 @@
 !src/
 !src/**
 
+# Liberar: submodule LatentSync (bytedance/LatentSync)
+!latentsync/
+!latentsync/**
+
 # Liberar: startup script para provisionar a GPU VM
 !infra/
 !infra/startup_arch4.sh
@@ -21,7 +25,9 @@
 
 # Liberar: config do build
 !cloudbuild.yaml
+!cloudbuild-*.yaml
 !requirements.txt
+!.gitmodules
 
 # Excluir cache Python e outputs
 __pycache__/

@@ -25,7 +25,7 @@ ELEVENLABS_API_KEY = get_secret("ELEVEN_LABS_API_KEY")
 if ELEVENLABS_API_KEY:
     ELEVENLABS_API_KEY = ELEVENLABS_API_KEY.strip()
 VOICE_ID = "XrExE9yKIg1WjnnlVkGX" # Sarah Customizada ElevenLabs (Reference p_5125)
-DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10"
+DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden"
 
 class LanaIndustrialEngine:
     """Ferramentas de infraestrutura GCP com Inteligência Maestro V18 (Gold Standard)."""
@@ -372,11 +372,9 @@ class LanaIndustrialEngine:
 
     def bootstrap_v18(self, is_prebaked=False):
         """
-        Bootstrap v2.10 — Código na imagem, deps baked, sem pip install runtime.
-        Pull da imagem e run do container são comandos SSH separados para
-        evitar timeout do tunnel IAP durante o download da imagem (~15GB).
+        Bootstrap v2.10-golden — LatentSync na imagem, sem sync GCS de código.
+        Pull da imagem e run do container são comandos SSH separados.
         """
-        GCS_LATENTSYNC = "gs://brasil-ai-avatars-vault/latentsync"
         GCS_ASSETS = "gs://lana-weights-universal/assets"
         
         def _ssh(cmd_str, label="CMD", max_retries=2):
@@ -398,10 +396,10 @@ class LanaIndustrialEngine:
                     time.sleep(5)
             return res
 
-        print("\n[AGNO] === INICIANDO BOOTSTRAP v2.10 ===")
+        print("\n[AGNO] === INICIANDO BOOTSTRAP v2.10-golden ===")
         
         # 1. Aguardar Docker + preparar ambiente
-        print("[AGNO] [1/6] Aguardando Docker e preparando ambiente...")
+        print("[AGNO] [1/4] Aguardando Docker e autenticando registry...")
         for i in range(30):
             check_res = _ssh("which docker && sudo docker ps > /dev/null 2>&1 && echo DOCKER_OK", "DOCKER_WAIT")
             if "DOCKER_OK" in check_res.stdout:
@@ -412,7 +410,7 @@ class LanaIndustrialEngine:
             raise Exception("Docker não disponível após 150s. Startup script falhou?")
         
         for _ in range(3):
-            res = _ssh("sudo mkdir -p /workspace/src /workspace/outputs/temp /workspace/latentsync/assets && "
+            res = _ssh("sudo mkdir -p /workspace/outputs/temp && "
                        "sudo chmod -R 777 /workspace && "
                        "sudo gcloud auth configure-docker us-east1-docker.pkg.dev --quiet", "PREP")
             if res.returncode == 0: break
@@ -420,29 +418,24 @@ class LanaIndustrialEngine:
         else:
             raise Exception(f"Falha no setup inicial: {res.stderr}")
 
-        # 2. Sincronizar codebase LatentSync (~120 arquivos)
-        print("[AGNO] [2/6] Sincronizando codebase LatentSync...")
-        _ssh(f"mkdir -p /workspace/latentsync && "
-             f"gsutil -m cp -r {GCS_LATENTSYNC}/* /workspace/latentsync/", "LATENTSYNC")
-
-        # 3. Sincronizar assets de vídeo + montar checkpoints
-        print("[AGNO] [3/6] Sincronizando assets e montando checkpoints...")
+        # 2. Assets + checkpoints (ainda no GCS, ~10s)
+        print("[AGNO] [2/4] Sincronizando assets e montando checkpoints...")
         _ssh(f"gsutil -m cp {GCS_ASSETS}/*.mp4 /workspace/latentsync/assets/ 2>/dev/null || true && "
              f"rm -rf /workspace/latentsync/checkpoints && "
-             f"ln -sfn /mnt/weights /workspace/latentsync/checkpoints 2>/dev/null || true", "ASSETS_CHECKPOINTS")
+             f"ln -sfn /mnt/weights /workspace/latentsync/checkpoints", "ASSETS_CHECKPOINTS")
 
-        # 4. Pull da imagem Docker
+        # 3. Pull da imagem Docker
         if not is_prebaked:
-            print("[AGNO] [4/6] Baixando imagem Docker (~15GB, pode levar ate 10min)...")
+            print("[AGNO] [3/4] Baixando imagem Docker (~15GB)...")
             pull_res = _ssh(f"sudo docker pull {DOCKER_IMAGE}", "DOCKER_PULL", max_retries=2)
             if pull_res.returncode != 0:
-                raise Exception(f"Falha ao baixar imagem Docker: {pull_res.stderr[:300]}")
-            print("[AGNO] Imagem Docker baixada com sucesso.")
+                raise Exception(f"Falha ao baixar imagem: {pull_res.stderr[:300]}")
+            print("[AGNO] Imagem Docker baixada.")
         else:
-            print("[AGNO] [4/6] Imagem pre-baked, pulando pull.")
+            print("[AGNO] [3/4] Imagem pre-baked, pulando pull.")
 
-        # 5. Subir container
-        print("[AGNO] [5/6] Iniciando container Docker...")
+        # 4. Subir container + iniciar servidor
+        print("[AGNO] [4/4] Iniciando container e servidor...")
         api_key = get_secret("API_SECRET_KEY", fallback="brasilai-avatar-2026")
         run_res = _ssh(f"sudo docker rm -f lana-engine 2>/dev/null; "
                        f"sudo docker run -d --name lana-engine --gpus all --network host "
@@ -450,7 +443,7 @@ class LanaIndustrialEngine:
                        f"-v /workspace:/workspace -v /mnt/weights:/mnt/weights "
                        f"{DOCKER_IMAGE} tail -f /dev/null", "DOCKER_RUN")
         if run_res.returncode != 0:
-            raise Exception(f"Falha ao subir container Docker: {run_res.stderr[:300]}")
+            raise Exception(f"Falha ao subir container: {run_res.stderr[:300]}")
 
         for _ in range(6):
             check = _ssh("sudo docker inspect -f '{{.State.Running}}' lana-engine 2>/dev/null", "CONTAINER_CHECK")
@@ -458,10 +451,8 @@ class LanaIndustrialEngine:
                 break
             time.sleep(5)
         else:
-            raise Exception("Container Docker não subiu após 30s.")
+            raise Exception("Container não subiu após 30s.")
 
-        # 6. Iniciar API RESTful no container
-        print("[AGNO] [6/6] Subindo API RESTful e aguardando resposta...")
         _ssh("sudo docker exec -d lana-engine python3 /workspace/src/industrial_main.py "
              "> /workspace/outputs/temp/server.log 2>&1", "SERVER")
 
@@ -469,10 +460,10 @@ class LanaIndustrialEngine:
             time.sleep(5)
             health_res = _ssh("curl -s --connect-timeout 2 http://localhost:8080/health > /dev/null && echo 'SERVER_OK'", "HEALTH")
             if "SERVER_OK" in health_res.stdout:
-                print(f"[AGNO] API operacional em {(i+1)*5}s. Máquina Pronta!")
+                print(f"[AGNO] Servidor operacional em {(i+1)*5}s. Máquina Pronta!")
                 return
         
-        raise Exception("API não respondeu após 120s. Verifique os logs do Docker.")
+        raise Exception("Servidor não respondeu após 120s.")
 
     def get_ip(self):
         """Recupera o IP público via gcloud CLI (compatível Linux/Windows)."""

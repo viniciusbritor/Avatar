@@ -2,11 +2,13 @@ import os
 import subprocess
 import uuid
 import time
+import json
+import threading
 import requests
 from typing import Dict, Optional
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from pydantic import BaseModel
-from google.cloud import storage
+from google.cloud import storage, firestore
 
 app = FastAPI(title="Brasil AI Industrial Avatar Engine")
 
@@ -255,6 +257,38 @@ def download_file(url: str, dest: str):
         r.raise_for_status()
         with open(dest, "wb") as f:
             f.write(r.content)
+
+def poll_pending_jobs():
+    """Polling inicial: busca jobs 'queued' no Firestore e processa."""
+    try:
+        db = firestore.Client(project="brasili-ia-news")
+        docs = list(db.collection("avatar_jobs")
+                    .where("status", "==", "queued")
+                    .limit(5).stream())
+        if not docs:
+            print("[STARTUP] Nenhum job pendente.")
+            return
+        print(f"[STARTUP] {len(docs)} job(s) pendente(s). Iniciando processamento...")
+        for doc in docs:
+            job = doc.to_dict()
+            job_id = job.get("job_id", doc.id)
+            audio_url = job.get("audio_url", "")
+            presenter = job.get("presenter_id", "default")
+            webhook_url = job.get("webhook_url", "")
+            if not audio_url:
+                print(f"[STARTUP] Job {job_id} sem audio_url, ignorando.")
+                continue
+            threading.Thread(
+                target=run_inference_wrapper,
+                args=(job_id, audio_url, presenter, webhook_url),
+                daemon=True
+            ).start()
+    except Exception as e:
+        print(f"[STARTUP] Erro no polling Firestore: {e}")
+
+@app.on_event("startup")
+def on_startup():
+    threading.Thread(target=poll_pending_jobs, daemon=True).start()
 
 if __name__ == "__main__":
     import uvicorn
