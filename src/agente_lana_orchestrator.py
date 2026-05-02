@@ -406,6 +406,17 @@ class LanaIndustrialEngine:
 
         print("\n[AGNO] === INICIANDO BOOTSTRAP v3.1.6 ===")
         
+        # 0. Aguardar Docker estar instalado (startup script pode demorar)
+        print("[AGNO] [0/7] Aguardando Docker estar pronto...")
+        for i in range(30):
+            check_res = _ssh("which docker && sudo docker ps > /dev/null 2>&1 && echo DOCKER_OK", "DOCKER_WAIT")
+            if "DOCKER_OK" in check_res.stdout:
+                print(f"[AGNO] Docker pronto em {i*5}s.")
+                break
+            time.sleep(5)
+        else:
+            raise Exception("Docker não disponível após 150s. Startup script falhou?")
+        
         # 1. Preparar filesystem e autenticação
         print("[AGNO] [1/6] Preparando ambiente...")
         for _ in range(3):
