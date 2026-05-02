@@ -66,10 +66,10 @@ RUN pip3 install --no-cache-dir \
 
 # ═══════════════════════════════════════════════════════════════════════════
 # LAYER 4: LatentSync Dependencies — muda ao adicionar features novas
-# numpy repetido aqui porque lws precisa dele no build isolation do pip
+# --no-build-isolation: lws precisa de numpy no build, mas pip cria
+# um ambiente isolado vazio. Forçamos usar o numpy já instalado.
 # ═══════════════════════════════════════════════════════════════════════════
-RUN pip3 install --no-cache-dir \
-    numpy==1.26.4 \
+RUN pip3 install --no-cache-dir --no-build-isolation \
     eva-decord==0.6.1 \
     accelerate==0.27.2 \
     kornia==0.7.3 \
