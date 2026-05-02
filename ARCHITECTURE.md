@@ -30,12 +30,12 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 - **Estratégia de Boot:** Arquitetura 4 (Nativa).
     - **Golden Disks:** Modelos pesados são montados via **GCS Fuse** em `/mnt/weights` (Zero download time).
     - **Startup Script:** Configura o Docker e Nvidia Toolkit em segundos.
-    - **Docker Image:** `avatar-l4:v2.9` (Baked com LatentSync e dependências CUDA).
+    - **Docker Image:** `avatar-l4:v2.10` (Layers otimizadas, todas deps baked, código incluso).
 
-### 2.4 Devolução e Gatilho (Pub/Sub)
+### 2.4 Devolução e Gatilho (Firestore + GCS)
 - **Storage:** Vídeos salvos em `gs://brasil-ai-avatars-vault/outputs/`.
-- **Trigger:** Notificação GCS vinculada ao tópico `avatar-outputs-topic`.
-- **Local Bridge:** Um listener Pub/Sub (`sync_bridge.py`) na máquina local recebe o sinal de conclusão e realiza o download instantâneo para a pasta `sucesso/`.
+- **Trigger:** O webhook da GPU atualiza o Firestore com status `completed` + `video_path`.
+- **Local Bridge:** `sync_bridge.py` faz polling no Firestore (sem dependência de Pub/Sub) e baixa o vídeo para `sucesso/` assim que detecta o status `completed`.
 
 ---
 
@@ -47,7 +47,7 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 4.  **Caça por GPU:** O Maestro busca globalmente (13+ zonas) por uma GPU L4. Se necessário, cria uma nova.
 5.  **Processamento:** A GPU executa o Lip Sync e sobe o vídeo para o GCS.
 6.  **Callback:** O Worker avisa a API via Webhook que o vídeo está pronto.
-7.  **Entrega:** O Pub/Sub dispara e o arquivo aparece na pasta local do usuário em milissegundos.
+7.  **Entrega:** O sync_bridge local (polling Firestore) detecta o status `completed`, baixa o vídeo do GCS, e salva em `sucesso/`.
 8.  **Purga:** A GPU se auto-desliga após o processamento (Sentinel Mode) para garantir custo zero.
 
 ---
@@ -56,8 +56,8 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 - **NUNCA** mude versões de pacotes em `requirements.txt` sem validar o grafo de dependências (especialmente Protobuf).
 - **SEMPRE** use `X-API-Key` vinda do Secret Manager.
 - **A IMAGEM DA API** deve ser leve (sem CUDA).
-- **A IMAGEM DO WORKER** deve conter tudo (Imutável).
+- **A IMAGEM DO WORKER** deve conter tudo (Imutável), com código como última layer para cache eficiente.
 
 ---
 
-*Documento atualizado em 2026-05-01 por Antigravity (v3.1.6 Release).*
+*Documento atualizado em 2026-05-02 por Antigravity (v3.1.6-r2).*

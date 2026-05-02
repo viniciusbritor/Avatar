@@ -12,6 +12,7 @@ import os
 import uuid
 import time
 import json
+import signal
 import threading
 from datetime import datetime
 from typing import Dict, Optional
@@ -47,6 +48,8 @@ except Exception as e:
     tasks_client = None
 
 API_SECRET_KEY = get_secret("API_SECRET_KEY", fallback="brasilai-avatar-2026")
+
+signal.signal(signal.SIGHUP, signal.SIG_IGN)
 
 app = FastAPI(
     title="Brasil AI — Avatar Industrial API",

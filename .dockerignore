@@ -1,0 +1,64 @@
+# .dockerignore — Contexto limpo para builds Docker (API e L4)
+# Exclui arquivos que não pertencem à imagem
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Outputs e dados locais
+outputs/
+sucesso/
+data/
+scratch/
+temp/
+.temp/
+
+# Node/FinOps
+finops-dashboard/
+node_modules/
+
+# Docs e assets
+docs/
+
+# Windows
+*.bat
+*.ps1
+
+# Secrets e tokens
+token_master.json
+status_check.json
+fix_secret.py
+lifecycle.json
+
+# CI/triggers locais
+trigger_and_download.py
+
+# Dockerfiles antigos (não são contexto de build)
+infra/Dockerfile.avatar-l4-v2.8
+infra/Dockerfile.l4
+infra/Dockerfile.t4
+infra/Dockerfile.runpod
+
+# Scripts de boot antigos
+infra/boot_industrial_v18.sh
+infra/boot_industrial_v19_baked.sh
+infra/prepare_container.sh
+infra/startup-script.sh
+
+# testes
+tests/
+
+# gcloudignore proprio
+.gcloudignore
+
+# IDE
+.vscode/
+.idea/

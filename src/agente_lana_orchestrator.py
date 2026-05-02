@@ -25,7 +25,7 @@ ELEVENLABS_API_KEY = get_secret("ELEVEN_LABS_API_KEY")
 if ELEVENLABS_API_KEY:
     ELEVENLABS_API_KEY = ELEVENLABS_API_KEY.strip()
 VOICE_ID = "XrExE9yKIg1WjnnlVkGX" # Sarah Customizada ElevenLabs (Reference p_5125)
-        DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10"
+DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10"
 
 class LanaIndustrialEngine:
     """Ferramentas de infraestrutura GCP com Inteligência Maestro V18 (Gold Standard)."""
@@ -143,27 +143,20 @@ class LanaIndustrialEngine:
                 time.sleep(20)
 
             if self._test_ssh(existing_name, existing_zone, max_retries=5, progress_callback=progress_callback):
-                self._ensure_server_running() # Garante que o /health está acessível
-                ip = self.get_ip()
-                if ip:
-                    # Roteamento Inteligente: Aguarda o Docker estar pronto em máquinas existentes
-                    if progress_callback: progress_callback(f"Motor {existing_name} detectado. Aguardando Docker (8080)...")
-                    docker_ready = False
-                    for _ in range(12): # 60 segundos de tolerância
-                        try:
-                            res = requests.get(f"http://{ip}:8080/health", timeout=3)
-                            health_data = res.json()
-                            if not health_data.get("busy", False):
-                                if progress_callback: progress_callback("Motor L4 livre e pronto!")
-                                self.start_heartbeat()
-                                return ip
-                            else:
-                                print(f"[SCALE-OUT] Máquina {existing_name} Ocupada. Passando para a próxima...")
-                                break # Está ocupada mesmo, não adianta esperar
-                        except:
-                            time.sleep(5)
-                    
-                    print(f"[WARN] Docker não subiu em {existing_name}. Tentando próxima ou Scale-Out.")
+                self._ensure_server_running()
+                if progress_callback: progress_callback(f"Motor {existing_name} detectado. Verificando disponibilidade...")
+                for _ in range(12):
+                    health_res = self._health_check_via_ssh()
+                    if health_res is not None:
+                        if not health_res.get("busy", False):
+                            if progress_callback: progress_callback("Motor L4 livre e pronto!")
+                            self.start_heartbeat()
+                            return self.get_ip()
+                        else:
+                            print(f"[SCALE-OUT] Máquina {existing_name} Ocupada. Passando para a próxima...")
+                            break
+                    time.sleep(5)
+                print(f"[WARN] Health check falhou em {existing_name}. Tentando próxima ou Scale-Out.")
             
             # Se chegou aqui, ou ssh falhou ou a máquina está ocupada.
             # Limpeza apenas se for uma máquina zumbi inalcançável (opcional). 
@@ -309,10 +302,9 @@ class LanaIndustrialEngine:
             return {"error": f"Método {method} não suportado via HTTP."}
 
     def _ensure_server_running(self):
-        """Garante que o container e o servidor MCP estão operacionais (v2.9)."""
+        """Garante que o container e o servidor estão operacionais (v2.10)."""
         print(f"[AGNO] Validando integridade do Motor em {self.active_instance}...", flush=True)
         
-        # 1. Verificar se o container existe
         check_cmd = [
             "gcloud", "compute", "ssh", self.active_instance, "--project", self.project_id,
             "--zone", self.active_zone, "--tunnel-through-iap", "--command",
@@ -322,8 +314,7 @@ class LanaIndustrialEngine:
         res = self._run_ssh_cmd(check_cmd)
         
         if res.returncode != 0 or "true" not in res.stdout.lower():
-            print(f"[AGNO] Container não encontrado ou parado. Criando container passivo (v2.9)...", flush=True)
-            # Auto-criar o container passivo
+            print(f"[AGNO] Container não encontrado ou parado. Criando container (v2.10)...", flush=True)
             run_cmd = [
                 "gcloud", "compute", "ssh", self.active_instance, "--project", self.project_id,
                 "--zone", self.active_zone, "--tunnel-through-iap", "--command",
@@ -336,8 +327,8 @@ class LanaIndustrialEngine:
                 "--quiet"
             ]
             self._run_ssh_cmd(run_cmd)
+            time.sleep(10)
 
-        # 2. Health Check do Servidor MCP
         health_cmd = [
             "gcloud", "compute", "ssh", self.active_instance, "--project", self.project_id,
             "--zone", self.active_zone, "--tunnel-through-iap", "--command",
@@ -346,25 +337,10 @@ class LanaIndustrialEngine:
         ]
         health_res = self._run_ssh_cmd(health_cmd)
         if "SERVER_OK" in health_res.stdout:
-            print(f"[AGNO] Motor e Servidor MCP operacionais.")
+            print(f"[AGNO] Motor e Servidor operacionais.")
             return
 
-        # 3. Reanimação: Buscar scripts do GCS + Iniciar Servidor
-        GCS_SCRIPTS = "gs://brasil-ai-avatars-vault/scripts"
-        
-        print(f"[AGNO] Sincronizando scripts do GCS...")
-        sync_cmd = [
-            "gcloud", "compute", "ssh", self.active_instance, "--project", self.project_id,
-            "--zone", self.active_zone, "--tunnel-through-iap", "--command",
-            f"mkdir -p /workspace/src && "
-            f"gsutil -m cp {GCS_SCRIPTS}/* /workspace/ && "
-            f"cp /workspace/industrial_main.py /workspace/src/industrial_main.py && "
-            f"cp /workspace/lipsync_pipeline.py /workspace/src/lipsync_pipeline.py",
-            "--quiet"
-        ]
-        self._run_ssh_cmd(sync_cmd)
-
-        print(f"[AGNO] Iniciando Servidor MCP (FastAPI)...")
+        print(f"[AGNO] Reanimando servidor...")
         exec_cmd = [
             "gcloud", "compute", "ssh", self.active_instance, "--project", self.project_id,
             "--zone", self.active_zone, "--tunnel-through-iap", "--command",
@@ -373,19 +349,37 @@ class LanaIndustrialEngine:
         ]
         self._run_ssh_cmd(exec_cmd)
         time.sleep(8)
-        print("[AGNO] Motor e Servidor MCP acionados.")
+        print("[AGNO] Motor e Servidor acionados.")
+
+    def _health_check_via_ssh(self):
+        """Health check do servidor via SSH (bypassa firewall GCP na porta 8080)."""
+        if not self.active_instance:
+            return None
+        cmd = [
+            "gcloud", "compute", "ssh", self.active_instance, "--project", self.project_id,
+            "--zone", self.active_zone, "--tunnel-through-iap", "--command",
+            "curl -s --connect-timeout 3 http://localhost:8080/health 2>/dev/null",
+            "--quiet"
+        ]
+        res = self._run_ssh_cmd(cmd)
+        if res.returncode == 0 and res.stdout.strip():
+            try:
+                import json
+                return json.loads(res.stdout.strip())
+            except Exception:
+                pass
+        return None
 
     def bootstrap_v18(self, is_prebaked=False):
         """
-        Bootstrap v3.1.6 — Resiste a pulls longos (>5min).
+        Bootstrap v2.10 — Código na imagem, deps baked, sem pip install runtime.
         Pull da imagem e run do container são comandos SSH separados para
         evitar timeout do tunnel IAP durante o download da imagem (~15GB).
         """
-        GCS_SCRIPTS = "gs://brasil-ai-avatars-vault/scripts"
-DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10"
+        GCS_LATENTSYNC = "gs://brasil-ai-avatars-vault/latentsync"
+        GCS_ASSETS = "gs://lana-weights-universal/assets"
         
         def _ssh(cmd_str, label="CMD", max_retries=2):
-            """Helper para executar SSH com retry e keepalive."""
             for attempt in range(max_retries):
                 cmd = [
                     "gcloud", "compute", "ssh", self.active_instance, "--project", self.project_id,
@@ -404,10 +398,10 @@ DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.1
                     time.sleep(5)
             return res
 
-        print("\n[AGNO] === INICIANDO BOOTSTRAP v3.1.6 ===")
+        print("\n[AGNO] === INICIANDO BOOTSTRAP v2.10 ===")
         
-        # 0. Aguardar Docker estar instalado (startup script pode demorar)
-        print("[AGNO] [1/8] Aguardando Docker estar pronto...")
+        # 1. Aguardar Docker + preparar ambiente
+        print("[AGNO] [1/6] Aguardando Docker e preparando ambiente...")
         for i in range(30):
             check_res = _ssh("which docker && sudo docker ps > /dev/null 2>&1 && echo DOCKER_OK", "DOCKER_WAIT")
             if "DOCKER_OK" in check_res.stdout:
@@ -417,8 +411,6 @@ DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.1
         else:
             raise Exception("Docker não disponível após 150s. Startup script falhou?")
         
-        # 1. Preparar filesystem e autenticação
-        print("[AGNO] [2/8] Preparando ambiente...")
         for _ in range(3):
             res = _ssh("sudo mkdir -p /workspace/src /workspace/outputs/temp /workspace/latentsync/assets && "
                        "sudo chmod -R 777 /workspace && "
@@ -428,33 +420,29 @@ DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.1
         else:
             raise Exception(f"Falha no setup inicial: {res.stderr}")
 
-        # 2. Sincronizar Assets e Scripts do Bucket
-        print("[AGNO] [2/7] Sincronizando Assets e Scripts (Bucket)...")
-        _ssh(f"gsutil -m cp gs://lana-weights-universal/assets/*.mp4 /workspace/latentsync/assets/ 2>/dev/null || true && "
-             f"gsutil -m cp {GCS_SCRIPTS}/* /workspace/ 2>/dev/null || true", "BUCKET_SYNC")
+        # 2. Sincronizar codebase LatentSync (~120 arquivos)
+        print("[AGNO] [2/6] Sincronizando codebase LatentSync...")
+        _ssh(f"mkdir -p /workspace/latentsync && "
+             f"gsutil -m cp -r {GCS_LATENTSYNC}/* /workspace/latentsync/", "LATENTSYNC")
 
-        # 2b. Sincronizar codebase LatentSync completa
-        print("[AGNO] [3/7] Sincronizando codebase LatentSync (~120 arquivos)...")
-        _ssh("mkdir -p /workspace/latentsync && "
-             "gsutil -m cp -r gs://brasil-ai-avatars-vault/latentsync/* /workspace/latentsync/ 2>/dev/null || true", "LATENTSYNC")
-
-        # 3. Preparar Golden Disk
-        print("[AGNO] [4/7] Mapeando Discos de Modelos...")
-        _ssh("rm -rf /workspace/latentsync/checkpoints && "
-             "ln -sfn /mnt/weights /workspace/latentsync/checkpoints 2>/dev/null || true", "CHECKPOINTS")
+        # 3. Sincronizar assets de vídeo + montar checkpoints
+        print("[AGNO] [3/6] Sincronizando assets e montando checkpoints...")
+        _ssh(f"gsutil -m cp {GCS_ASSETS}/*.mp4 /workspace/latentsync/assets/ 2>/dev/null || true && "
+             f"rm -rf /workspace/latentsync/checkpoints && "
+             f"ln -sfn /mnt/weights /workspace/latentsync/checkpoints 2>/dev/null || true", "ASSETS_CHECKPOINTS")
 
         # 4. Pull da imagem Docker
         if not is_prebaked:
-            print("[AGNO] [5/8] Baixando imagem Docker (~15GB, pode levar ate 10min)...")
+            print("[AGNO] [4/6] Baixando imagem Docker (~15GB, pode levar ate 10min)...")
             pull_res = _ssh(f"sudo docker pull {DOCKER_IMAGE}", "DOCKER_PULL", max_retries=2)
             if pull_res.returncode != 0:
                 raise Exception(f"Falha ao baixar imagem Docker: {pull_res.stderr[:300]}")
             print("[AGNO] Imagem Docker baixada com sucesso.")
         else:
-            print("[AGNO] [5/7] Imagem pre-baked, pulando pull.")
+            print("[AGNO] [4/6] Imagem pre-baked, pulando pull.")
 
-        # 5. Subir container (comando separado)
-        print("[AGNO] [6/8] Iniciando container Docker...")
+        # 5. Subir container
+        print("[AGNO] [5/6] Iniciando container Docker...")
         api_key = get_secret("API_SECRET_KEY", fallback="brasilai-avatar-2026")
         run_res = _ssh(f"sudo docker rm -f lana-engine 2>/dev/null; "
                        f"sudo docker run -d --name lana-engine --gpus all --network host "
@@ -464,7 +452,6 @@ DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.1
         if run_res.returncode != 0:
             raise Exception(f"Falha ao subir container Docker: {run_res.stderr[:300]}")
 
-        # Verificar se container subiu
         for _ in range(6):
             check = _ssh("sudo docker inspect -f '{{.State.Running}}' lana-engine 2>/dev/null", "CONTAINER_CHECK")
             if "true" in check.stdout.lower():
@@ -473,12 +460,11 @@ DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.1
         else:
             raise Exception("Container Docker não subiu após 30s.")
 
-        # 6. Iniciar API RESTful (comando separado)
-        print("[AGNO] [6/7] Subindo API RESTful...")
-        _ssh("sudo docker exec -d lana-engine python3 /workspace/industrial_main.py "
+        # 6. Iniciar API RESTful no container
+        print("[AGNO] [6/6] Subindo API RESTful e aguardando resposta...")
+        _ssh("sudo docker exec -d lana-engine python3 /workspace/src/industrial_main.py "
              "> /workspace/outputs/temp/server.log 2>&1", "SERVER")
 
-        print("[AGNO] Aguardando servidor responder (REST API)...")
         for i in range(24):
             time.sleep(5)
             health_res = _ssh("curl -s --connect-timeout 2 http://localhost:8080/health > /dev/null && echo 'SERVER_OK'", "HEALTH")

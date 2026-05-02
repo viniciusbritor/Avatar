@@ -1,0 +1,51 @@
+# ─── Brasil AI Avatar L4 — Dependências Completas (v2.10) ──────────────────
+# Este arquivo é a REFERÊNCIA CANÔNICA de todas as deps da imagem L4.
+# Versões fixadas para garantir builds determinísticos e evitar surpresas.
+# 
+# A instalação no Dockerfile é dividida em layers independentes:
+#   1. PyTorch (CUDA 12.1) — raramente muda
+#   2. ML Core              — muda a cada upgrade de diffusers/transformers
+#   3. LatentSync Deps      — muda ao adicionar features novas
+#   4. Servidor API         — estável
+#   5. DeepCache (git)      — última layer
+
+# ── Layer 1: PyTorch CUDA 12.1 (instalado com --extra-index-url) ──────────
+torch==2.5.1+cu121
+torchvision==0.20.1+cu121
+torchaudio==2.5.1+cu121
+
+# ── Layer 2: ML Core ──────────────────────────────────────────────────────
+numpy==1.26.4
+diffusers==0.31.0
+transformers==4.46.1
+opencv-python-headless==4.10.0.84
+insightface==0.7.3
+facexlib==0.3.0
+onnxruntime-gpu==1.19.2
+omegaconf==2.3.0
+einops==0.8.0
+gfpgan==1.3.8
+scipy==1.13.1
+
+# ── Layer 3: LatentSync Dependencies ──────────────────────────────────────
+eva-decord==0.6.1
+accelerate==0.27.2
+kornia==0.7.3
+lws==1.2.0
+imageio==2.30.0
+more-itertools==9.0.0
+soundfile==0.12.1
+librosa==0.10.2
+
+# ── Layer 4: API Server (industrial_main.py) ─────────────────────────────
+fastapi==0.115.0
+uvicorn==0.31.0
+python-multipart==0.0.12
+google-cloud-storage==2.18.2
+requests==2.32.3
+pydantic==2.7.4
+python-dotenv==1.0.1
+tqdm==4.66.5
+
+# ── Layer 5: DeepCache (do git, instalado por último) ────────────────────
+git+https://github.com/horseee/DeepCache.git@master

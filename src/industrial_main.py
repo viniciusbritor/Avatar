@@ -57,10 +57,6 @@ def update_job_status(job_id, status, result_url=None, error=None):
     if error: jobs_db[job_id]["error"] = error
     save_jobs(jobs_db)
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
 class DIDScript(BaseModel):
     type: str = "audio"
     audio_url: Optional[str] = None

@@ -89,7 +89,7 @@ class CloudLanaEngine(LanaIndustrialEngine):
         print(f"[ERROR] Falha de SSH com {name} após {max_retries} tentativas.")
         return False
 
-    def _find_existing_engine(self):
+    def _find_existing_engines(self):
         """Override: usa lista nativa (sem shell=True, sem 2>NUL Windows)."""
         print("[MAESTRO] Buscando motores ativos no GCP...")
         cmd = [
@@ -106,12 +106,17 @@ class CloudLanaEngine(LanaIndustrialEngine):
                 import json
                 instances = json.loads(res.stdout)
                 if instances:
-                    inst = sorted(instances, key=lambda x: x['name'], reverse=True)[0]
-                    print(f"[REUSE] Motor detectado: {inst['name']}")
-                    return inst['name'], inst['zone'].split('/')[-1]
-            except Exception:
-                pass
-        return None, None
+                    inst_sorted = sorted(instances, key=lambda x: x['name'], reverse=True)
+                    print(f"[REUSE] Motores detectados via CLI: {len(inst_sorted)}")
+                    return [{
+                        "name": v["name"],
+                        "zone": v.get("zone", "").split("/")[-1],
+                        "status": v.get("status", "RUNNING")
+                    } for v in inst_sorted]
+            except Exception as e:
+                print(f"[WARN] Falha ao parsear JSON do gcloud: {e}")
+        print("[MAESTRO] Nenhum motor ativo encontrado nas zonas do projeto.")
+        return []
 
     def _purge_zone(self, name, zone):
         """Override: sem shell=True nem 2>NUL (Windows-only). Compatível com Linux."""

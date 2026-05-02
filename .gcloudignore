@@ -16,6 +16,8 @@
 # Liberar: startup script para provisionar a GPU VM
 !infra/
 !infra/startup_arch4.sh
+!infra/Dockerfile.avatar-l4-v2.10
+!infra/requirements-l4.txt
 
 # Liberar: config do build
 !cloudbuild.yaml
