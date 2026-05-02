@@ -407,7 +407,7 @@ class LanaIndustrialEngine:
         print("\n[AGNO] === INICIANDO BOOTSTRAP v3.1.6 ===")
         
         # 0. Aguardar Docker estar instalado (startup script pode demorar)
-        print("[AGNO] [0/7] Aguardando Docker estar pronto...")
+        print("[AGNO] [1/8] Aguardando Docker estar pronto...")
         for i in range(30):
             check_res = _ssh("which docker && sudo docker ps > /dev/null 2>&1 && echo DOCKER_OK", "DOCKER_WAIT")
             if "DOCKER_OK" in check_res.stdout:
@@ -418,7 +418,7 @@ class LanaIndustrialEngine:
             raise Exception("Docker não disponível após 150s. Startup script falhou?")
         
         # 1. Preparar filesystem e autenticação
-        print("[AGNO] [1/6] Preparando ambiente...")
+        print("[AGNO] [2/8] Preparando ambiente...")
         for _ in range(3):
             res = _ssh("sudo mkdir -p /workspace/src /workspace/outputs/temp /workspace/latentsync/assets && "
                        "sudo chmod -R 777 /workspace && "
@@ -445,7 +445,7 @@ class LanaIndustrialEngine:
 
         # 4. Pull da imagem Docker
         if not is_prebaked:
-            print("[AGNO] [5/7] Baixando imagem Docker (~15GB, pode levar ate 10min)...")
+            print("[AGNO] [5/8] Baixando imagem Docker (~15GB, pode levar ate 10min)...")
             pull_res = _ssh(f"sudo docker pull {DOCKER_IMAGE}", "DOCKER_PULL", max_retries=2)
             if pull_res.returncode != 0:
                 raise Exception(f"Falha ao baixar imagem Docker: {pull_res.stderr[:300]}")
@@ -454,7 +454,7 @@ class LanaIndustrialEngine:
             print("[AGNO] [5/7] Imagem pre-baked, pulando pull.")
 
         # 5. Subir container (comando separado)
-        print("[AGNO] [6/7] Iniciando container Docker...")
+        print("[AGNO] [6/8] Iniciando container Docker...")
         api_key = get_secret("API_SECRET_KEY", fallback="brasilai-avatar-2026")
         run_res = _ssh(f"sudo docker rm -f lana-engine 2>/dev/null; "
                        f"sudo docker run -d --name lana-engine --gpus all --network host "
@@ -473,8 +473,13 @@ class LanaIndustrialEngine:
         else:
             raise Exception("Container Docker não subiu após 30s.")
 
-        # 6. Iniciar API RESTful (comando separado)
-        print("[AGNO] [7/7] Subindo API RESTful...")
+        # 6. Instalar dependências extras no container (decord para LatentSync)
+        print("[AGNO] [6/8] Instalando decord no container...")
+        _ssh("sudo docker exec lana-engine pip3 install --no-cache-dir decord eva-decord 2>/dev/null || "
+             "sudo docker exec lana-engine pip3 install --no-cache-dir eva-decord 2>/dev/null || true", "DECORD")
+
+        # 7. Iniciar API RESTful (comando separado)
+        print("[AGNO] [7/8] Subindo API RESTful...")
         _ssh("sudo docker exec -d lana-engine python3 /workspace/industrial_main.py "
              "> /workspace/outputs/temp/server.log 2>&1", "SERVER")
 
