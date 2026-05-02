@@ -157,3 +157,24 @@ class CloudLanaEngine(LanaIndustrialEngine):
             errors="ignore"
         )
         return res
+
+    def get_ip(self):
+        """Override: usa gcloud CLI para obter IP externo (sem compute_v1)."""
+        import json
+        cmd = [
+            "gcloud", "compute", "instances", "describe",
+            self.active_instance,
+            "--project", self.project_id,
+            "--zone", self.active_zone,
+            "--format=json(networkInterfaces[0].accessConfigs[0].natIP)",
+            "--quiet"
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True,
+                             stdin=subprocess.DEVNULL, encoding="utf-8", errors="ignore")
+        if res.returncode == 0 and res.stdout.strip():
+            try:
+                data = json.loads(res.stdout)
+                return data["networkInterfaces"][0]["accessConfigs"][0]["natIP"]
+            except Exception:
+                pass
+        return None

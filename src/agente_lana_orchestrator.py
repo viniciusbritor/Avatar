@@ -25,7 +25,7 @@ ELEVENLABS_API_KEY = get_secret("ELEVEN_LABS_API_KEY")
 if ELEVENLABS_API_KEY:
     ELEVENLABS_API_KEY = ELEVENLABS_API_KEY.strip()
 VOICE_ID = "XrExE9yKIg1WjnnlVkGX" # Sarah Customizada ElevenLabs (Reference p_5125)
-DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4-v2.9:latest"
+DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.9"
 
 class LanaIndustrialEngine:
     """Ferramentas de infraestrutura GCP com Inteligência Maestro V18 (Gold Standard)."""
@@ -40,21 +40,32 @@ class LanaIndustrialEngine:
         self.active_instance = None
         self.active_zone = None
         self.current_gpu_type = "L4"
+        self.bucket_name = BUCKET_NAME
 
     def _run_ssh_cmd(self, cmd_list, use_y=True, capture=True):
-        """Helper robusto para rodar comandos via gcloud compute ssh no Windows/Plink."""
-        # Se for uma lista, junta com espaço.
-        if isinstance(cmd_list, list):
-            cmd_str = " ".join(cmd_list)
-        else:
-            cmd_str = cmd_list
-            
-        import sys
-        if sys.platform != "win32":
-            use_y = False
-            
-        final_cmd = f"echo y | {cmd_str}" if use_y else cmd_str
-        res = subprocess.run(final_cmd, shell=True, capture_output=capture, text=True, encoding='utf-8', errors='ignore')
+        if isinstance(cmd_list, str):
+            cmd_list = cmd_list.split()
+
+        if "--quiet" not in cmd_list:
+            cmd_list = list(cmd_list) + ["--quiet"]
+
+        cmd_str = " ".join(cmd_list)
+        if "compute ssh" in cmd_str:
+            if "--ssh-flag" not in cmd_str:
+                cmd_list += [
+                    "--ssh-flag=-o StrictHostKeyChecking=no",
+                    "--ssh-flag=-o UserKnownHostsFile=/dev/null",
+                    "--ssh-flag=-o LogLevel=ERROR"
+                ]
+
+        res = subprocess.run(
+            cmd_list,
+            capture_output=capture,
+            text=True,
+            stdin=subprocess.DEVNULL,
+            encoding="utf-8",
+            errors="ignore"
+        )
         return res
 
     def _test_ssh(self, name, zone, max_retries=15, progress_callback=None):
@@ -63,52 +74,46 @@ class LanaIndustrialEngine:
             if progress_callback:
                 progress_callback(f"Teste SSH ({i+1}/{max_retries})...")
             cmd = ["gcloud", "compute", "ssh", name, "--project", self.project_id,
-                   "--zone", zone, "--tunnel-through-iap", "--command", "\"echo SSH_OK\"", "--quiet"]
+                   "--zone", zone, "--tunnel-through-iap",
+                   "--command=echo SSH_OK", "--quiet"]
             
             res = self._run_ssh_cmd(cmd)
             if res.returncode == 0 and "SSH_OK" in res.stdout:
                 print(f"[MAESTRO] SSH estabelecido com {name}.")
                 return True
             else:
-                print(f"[DEBUG] SSH Fail: code={res.returncode}, out='{res.stdout.strip()}', err='{res.stderr.strip()}'")
+                print(f"[DEBUG] SSH Fail ({i+1}/{max_retries}): code={res.returncode}, out='{res.stdout.strip()[:80]}', err='{res.stderr.strip()[:100]}'")
             time.sleep(10)
-        print(f"[ERROR] Falha de SSH com {name} após várias tentativas.")
+        print(f"[ERROR] Falha de SSH com {name} após {max_retries} tentativas.")
         return False
 
     def _find_existing_engines(self):
-        """Busca por instâncias industriais já em execução usando a API nativa do GCP."""
-        print("[MAESTRO] Buscando motores ativos via API Nativa...")
-        try:
-            from google.cloud import compute_v1
-            client = compute_v1.InstancesClient()
-            
-            # Busca em todas as zonas do projeto (Aggregated List)
-            request = compute_v1.AggregatedListInstancesRequest(project=self.project_id)
-            agg_list = client.aggregated_list(request=request)
-            
-            instances = []
-            for zone, response in agg_list:
-                if response.instances:
-                    for inst in response.instances:
-                        # Filtro: Nome começa com lana-engine- e está RUNNING ou TERMINATED
-                        if inst.name.startswith("lana-engine-") and inst.status in ("RUNNING", "TERMINATED"):
-                            instances.append({
-                                "name": inst.name,
-                                "zone": zone.split('/')[-1],
-                                "status": inst.status
-                            })
-            
-            if instances:
-                # Retorna ordenado do mais novo pro mais antigo
-                inst_sorted = sorted(instances, key=lambda x: x['name'], reverse=True)
-                print(f"[REUSE] Motores detectados via API: {len(inst_sorted)}")
-                return inst_sorted
-            else:
-                print("[MAESTRO] Nenhum motor ativo encontrado nas zonas do projeto.")
-                
-        except Exception as e:
-            print(f"[ERROR] Falha na detecção nativa de instâncias: {e}")
-            
+        """Busca por instâncias industriais já em execução usando gcloud CLI."""
+        print("[MAESTRO] Buscando motores ativos via gcloud CLI...")
+        cmd = [
+            "gcloud", "compute", "instances", "list",
+            "--filter=name~lana-engine- AND status=RUNNING",
+            "--format=json",
+            "--project", self.project_id,
+            "--quiet"
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True,
+                             stdin=subprocess.DEVNULL, encoding="utf-8", errors="ignore")
+        if res.returncode == 0 and res.stdout.strip():
+            try:
+                import json
+                instances = json.loads(res.stdout)
+                if instances:
+                    inst_sorted = sorted(instances, key=lambda x: x['name'], reverse=True)
+                    print(f"[REUSE] Motores detectados via CLI: {len(inst_sorted)}")
+                    return [{
+                        "name": i["name"],
+                        "zone": i.get("zone", "").split("/")[-1],
+                        "status": i.get("status", "RUNNING")
+                    } for i in inst_sorted]
+            except Exception as e:
+                print(f"[WARN] Falha ao parsear JSON do gcloud: {e}")
+        print("[MAESTRO] Nenhum motor ativo encontrado nas zonas do projeto.")
         return []
 
     def ensure_instance_ready(self, progress_callback=None, force_gpu="ALL"):
@@ -141,18 +146,24 @@ class LanaIndustrialEngine:
                 self._ensure_server_running() # Garante que o /health está acessível
                 ip = self.get_ip()
                 if ip:
-                    try:
-                        # Roteamento Inteligente: Testa o estado de Lock da GPU
-                        res = requests.get(f"http://{ip}:8080/health", timeout=3)
-                        health_data = res.json()
-                        if not health_data.get("busy", False):
-                            if progress_callback: progress_callback("Reusando motor L4 livre.")
-                            self.start_heartbeat()
-                            return ip
-                        else:
-                            print(f"[SCALE-OUT] Máquina {existing_name} Ocupada. Passando para a próxima...")
-                    except Exception as e:
-                        print(f"[WARN] Healthcheck falhou em {existing_name}, assumindo ocupada/quebrada.")
+                    # Roteamento Inteligente: Aguarda o Docker estar pronto em máquinas existentes
+                    if progress_callback: progress_callback(f"Motor {existing_name} detectado. Aguardando Docker (8080)...")
+                    docker_ready = False
+                    for _ in range(12): # 60 segundos de tolerância
+                        try:
+                            res = requests.get(f"http://{ip}:8080/health", timeout=3)
+                            health_data = res.json()
+                            if not health_data.get("busy", False):
+                                if progress_callback: progress_callback("Motor L4 livre e pronto!")
+                                self.start_heartbeat()
+                                return ip
+                            else:
+                                print(f"[SCALE-OUT] Máquina {existing_name} Ocupada. Passando para a próxima...")
+                                break # Está ocupada mesmo, não adianta esperar
+                        except:
+                            time.sleep(5)
+                    
+                    print(f"[WARN] Docker não subiu em {existing_name}. Tentando próxima ou Scale-Out.")
             
             # Se chegou aqui, ou ssh falhou ou a máquina está ocupada.
             # Limpeza apenas se for uma máquina zumbi inalcançável (opcional). 
@@ -170,16 +181,17 @@ class LanaIndustrialEngine:
             for attempt in range(2):
                 success, error_msg = self._create_gpu_instance(new_name, zone)
                 if success:
-                    if self._test_ssh(new_name, zone, max_retries=15, progress_callback=progress_callback):
-                        self.active_instance = new_name
-                        self.active_zone = zone
-                        self.current_gpu_type = "L4"
-                        self.start_heartbeat()
-                        # IMPORTANTE: Como a imagem atual (deeplearning-platform-release) não tem nada salvo, 
-                        # DEIXE False para baixar tudo. Quando criar a sua Custom Gold Image, mude para True!
-                        self.bootstrap_v18(is_prebaked=False)
-                        return self.get_ip()
-                    self._purge_zone(new_name, zone)
+                    try:
+                        if self._test_ssh(new_name, zone, max_retries=15, progress_callback=progress_callback):
+                            self.active_instance = new_name
+                            self.active_zone = zone
+                            self.current_gpu_type = "L4"
+                            self.start_heartbeat()
+                            self.bootstrap_v18(is_prebaked=False)
+                            return self.get_ip()
+                    finally:
+                        if self.active_instance is None:
+                            self._purge_zone(new_name, zone)
                     break # Pula para a próxima zona se o SSH falhou
                 
                 if "Quota" in error_msg or "GPUS_ALL_REGIONS" in error_msg:
@@ -194,14 +206,22 @@ class LanaIndustrialEngine:
     def _purge_zone(self, name, zone):
         """Purga absoluta de qualquer recurso na região para garantir Zero-Waste."""
         print(f"[ZERO-WASTE] Purgando {name} em {zone}...")
-        subprocess.run(f"gcloud compute instances delete {name} --project {self.project_id} --zone {zone} --delete-disks=all --quiet 2>NUL", shell=True)
-        # Tentar deletar disco avulso caso a instancia não tenha sido criada mas o disco sim
-        subprocess.run(f"gcloud compute disks delete {name} --project {self.project_id} --zone {zone} --quiet 2>NUL", shell=True)
+        subprocess.run(
+            ["gcloud", "compute", "instances", "delete", name,
+             "--project", self.project_id, "--zone", zone,
+             "--delete-disks=all", "--quiet"],
+            capture_output=True, stdin=subprocess.DEVNULL
+        )
+        subprocess.run(
+            ["gcloud", "compute", "disks", "delete", name,
+             "--project", self.project_id, "--zone", zone, "--quiet"],
+            capture_output=True, stdin=subprocess.DEVNULL
+        )
 
     def _start_instance(self, inst):
         cmd = ["gcloud", "compute", "instances", "start", inst["name"], 
                "--project", self.project_id, "--zone", inst["zone"], "--quiet"]
-        res = subprocess.run(cmd, capture_output=True, text=True, shell=True)
+        res = subprocess.run(cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL)
         return res.returncode == 0
 
     def _create_gpu_instance(self, name, zone):
@@ -224,7 +244,7 @@ class LanaIndustrialEngine:
             "--quiet"
         ]
             
-        res = subprocess.run(" ".join(cmd), capture_output=True, text=True, shell=True)
+        res = subprocess.run(cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL)
         if res.returncode != 0:
             print(f"[ERROR] Failover em {zone}: {res.stderr}")
             return False, res.stderr
@@ -263,7 +283,9 @@ class LanaIndustrialEngine:
                 "script": {
                     "type": "audio",
                     "audio_url": params.get("audio_url")
-                }
+                },
+                "job_id": params.get("job_id"),
+                "webhook_url": params.get("webhook_url")
             }
             try:
                 res = requests.post(url, json=payload, timeout=15)
@@ -283,8 +305,8 @@ class LanaIndustrialEngine:
             return {"error": f"Método {method} não suportado via HTTP."}
 
     def _ensure_server_running(self):
-        """Garante que o container e o servidor MCP estão operacionais."""
-        print(f"[AGNO] Validando integridade do Motor em {self.active_instance}...")
+        """Garante que o container e o servidor MCP estão operacionais (v2.9)."""
+        print(f"[AGNO] Validando integridade do Motor em {self.active_instance}...", flush=True)
         
         # 1. Verificar se o container existe
         check_cmd = [
@@ -295,9 +317,8 @@ class LanaIndustrialEngine:
         ]
         res = self._run_ssh_cmd(check_cmd)
         
-        DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.7"
         if res.returncode != 0 or "true" not in res.stdout.lower():
-            print(f"[AGNO] Container não encontrado. Criando container passivo...")
+            print(f"[AGNO] Container não encontrado ou parado. Criando container passivo (v2.9)...", flush=True)
             # Auto-criar o container passivo
             run_cmd = [
                 "gcloud", "compute", "ssh", self.active_instance, "--project", self.project_id,
@@ -424,16 +445,24 @@ class LanaIndustrialEngine:
         raise Exception("API não respondeu após 120s. Verifique os logs do Docker.")
 
     def get_ip(self):
-        """Recupera o IP público da máquina usando SDK Nativo, sem bash."""
-        try:
-            from google.cloud import compute_v1
-            client = compute_v1.InstancesClient(project=self.project_id)
-            instance = client.get(project=self.project_id, zone=self.active_zone, instance=self.active_instance)
-            # Retorna o IP NAT externo
-            return instance.network_interfaces[0].access_configs[0].nat_i_p
-        except Exception as e:
-            print(f"[SDK] Erro ao recuperar IP nativo: {e}")
-            return None
+        """Recupera o IP público via gcloud CLI (compatível Linux/Windows)."""
+        cmd = [
+            "gcloud", "compute", "instances", "describe",
+            self.active_instance,
+            "--project", self.project_id,
+            "--zone", self.active_zone,
+            "--format=json(networkInterfaces[0].accessConfigs[0].natIP)",
+            "--quiet"
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True,
+                             stdin=subprocess.DEVNULL, encoding="utf-8", errors="ignore")
+        if res.returncode == 0 and res.stdout.strip():
+            try:
+                data = json.loads(res.stdout)
+                return data["networkInterfaces"][0]["accessConfigs"][0]["natIP"]
+            except Exception as e:
+                print(f"[SDK] Erro ao extrair IP da resposta JSON: {e}")
+        return None
 
     def heartbeat(self):
         """Envia um pulso de vida para o Sentinela remoto não desligar a máquina."""
@@ -555,7 +584,11 @@ class AgenteLanaOrchestrator:
     """Orquestrador V18 (Linear Maestro): Estabilidade Industrial via Execução Direta."""
     
     def __init__(self):
-        self.engine = LanaIndustrialEngine()
+        if sys.platform != "win32":
+            from api.cloud_engine import CloudLanaEngine
+            self.engine = CloudLanaEngine()
+        else:
+            self.engine = LanaIndustrialEngine()
         
         gemini_key = get_secret("GEMINI_API_KEY")
         if gemini_key:
@@ -566,66 +599,14 @@ class AgenteLanaOrchestrator:
         self.infra_pc, self.docker_pc, self.avatar_pc = 0, 0, 0
         self.infra_msg, self.docker_msg, self.avatar_msg = "Aguardando...", "Aguardando...", "Aguardando..."
 
-        # Mock do agente para manter compatibilidade com o resto da API
-        class SimpleMaestro:
-            def __init__(self, parent):
-                self.parent = parent
-            def run(self, prompt):
-                # Execução Linear Blindada
-                print(f"[MAESTRO] Iniciando Orquestração Linear...")
-                
-                # Extrair metadados básicos do prompt
-                job_id = "unknown"
-                if "ID '" in prompt:
-                    job_id = prompt.split("ID '")[1].split("'")[0]
-                elif "ID: " in prompt:
-                    job_id = prompt.split("ID: ")[1].split(".")[0]
-                
-                text = "Texto não identificado"
-                if "texto '" in prompt:
-                    text = prompt.split("texto '")[1].split("'")[0]
-                elif "Texto: " in prompt:
-                    text = prompt.split("Texto: ")[1].split("ID: ")[0]
-                
-                webhook_url = ""
-                if "webhook_url '" in prompt:
-                    webhook_url = prompt.split("webhook_url '")[1].split("'")[0]
-
-                try:
-                    # Passo 1: Infraestrutura (Garante GPU L4)
-                    self.parent._update_view(i_pc=10, i_m="Preparando GPU L4...")
-                    ip = self.parent.engine.ensure_instance_ready(
-                        progress_callback=lambda m: self.parent._update_view(i_m=m)
-                    )
-                    self.parent._update_view(i_pc=100, i_m=f"GPU Ativa em {ip}", d_pc=100, d_m="Container Pronto")
-                    
-                    # Passo 2: Áudio (Sarah ElevenLabs)
-                    self.parent._update_view(a_pc=10, a_m="Gerando Áudio Sarah...")
-                    audio_local = self.parent.generate_audio_local(text)
-                    audio_gcs = self.parent.engine.upload_assets(audio_local, job_id=job_id)
-                    self.parent._update_view(a_pc=50, a_m="Áudio no Vault GCS")
-                    
-                    # Passo 3: Renderização (Delegar para GPU)
-                    self.parent._update_view(a_pc=80, a_m="Despachando para GPU...")
-                    render_res = self.parent.dispatch_render_job(audio_gcs, job_id, webhook_url=webhook_url)
-                    
-                    self.parent._update_view(a_pc=100, a_m="SUCESSO")
-                    
-                    # Simula a estrutura de resposta do Agno
-                    class AgnoResponse:
-                        def __init__(self, content): self.content = content
-                    return AgnoResponse(f"SUCESSO: {render_res}")
-                except Exception as e:
-                    self.parent._update_view(err=True, a_m=f"ERRO: {str(e)[:50]}")
-                    raise e
-
-        self.agent = SimpleMaestro(self)
+        self.agent = None # Agno removido. Usando Pipeline Linear Direto.
 
     def _update_view(self, i_pc=None, d_pc=None, a_pc=None, i_m=None, d_m=None, a_m=None, err=False):
         if i_pc is not None: self.infra_pc = i_pc
         if d_pc is not None: self.docker_pc = d_pc
         if a_pc is not None: self.avatar_pc = a_pc
         if i_m: self.infra_msg = i_m
+        sys.stdout.flush()
         if d_m: self.docker_msg = d_m
         if a_m: self.avatar_msg = a_m
         self.engine.print_triple_progress(self.infra_pc, self.docker_pc, self.avatar_pc, self.infra_msg, self.docker_msg, self.avatar_msg, error=err)
@@ -670,33 +651,40 @@ class AgenteLanaOrchestrator:
             raise e
 
     def produce_video_from_text(self, text: str, job_id=None, index=1, total=1, force_gpu="ALL", webhook_url=None):
-        """Pipeline visual estabilizado."""
+        """Pipeline visual estabilizado (Linear e Real)."""
         if job_id is None:
             import uuid
             job_id = uuid.uuid4().hex[:8]
             
-        print(f"\n[JOB {job_id[:8]}] >>> INICIANDO PRODUÇÃO LINEAR <<<")
+        print(f"\n[JOB {job_id}] >>> INICIANDO PRODUÇÃO LINEAR (REAL) <<<")
         self._update_view(0, 0, 0, "Iniciando Orquestração...", "Aguardando...", "Aguardando...")
         
         try:
-            prompt = f"Produza um vídeo para o texto '{text}'. O Job ID é '{job_id}'."
-            if webhook_url:
-                prompt += f" Passe o webhook_url '{webhook_url}'."
-                
-            run_response = self.agent.run(prompt)
-            resposta = run_response.content
+            # Passo 1: Infraestrutura (Garante GPU L4)
+            self._update_view(i_pc=10, i_m="Preparando GPU L4...")
+            ip = self.engine.ensure_instance_ready(
+                progress_callback=lambda m: self._update_view(i_m=m)
+            )
+            self._update_view(i_pc=100, i_m=f"GPU Ativa em {ip}", d_pc=100, d_m="Container Pronto")
             
-            if "SUCESSO" in resposta.upper():
-                return {"status": "success", "job_id": job_id, "video_path": "Processando na GPU..."}
-            else:
-                return {"status": "error", "message": resposta}
-                
+            # Passo 2: Áudio (Sarah ElevenLabs)
+            self._update_view(a_pc=10, a_m="Gerando Áudio Sarah...")
+            audio_local = self.generate_audio_local(text)
+            audio_gcs = self.engine.upload_assets(audio_local, job_id=job_id)
+            self._update_view(a_pc=50, a_m="Áudio no Vault GCS")
+            
+            # Passo 3: Renderização (Delegar para GPU)
+            self._update_view(a_pc=80, a_m="Despachando para GPU...")
+            render_res = self.dispatch_render_job(audio_gcs, job_id, webhook_url=webhook_url)
+            
+            self._update_view(a_pc=100, a_m="SUCESSO")
+            return {"status": "success", "job_id": job_id, "video_path": "Processando na GPU..."}
+
         except Exception as e:
-            error_msg = str(e)
-            print(f"[ERROR] Falha Fatal: {error_msg}")
-            self._update_view(err=True, a_m=f"FALHA: {error_msg}")
-            return {"status": "error", "message": error_msg}
+            print(f"[ERROR] Pipeline Linear falhou: {e}")
+            self._update_view(err=True, a_m=f"ERRO: {str(e)[:50]}")
+            return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     maestro = AgenteLanaOrchestrator()
-    maestro.produce_video_from_text("Testando a Orquestração Cognitiva Agno. O Agente agora tem total controle do fluxo e ferramentas.")
+    maestro.produce_video_from_text("ESTADO DE GRACA INDUSTRIAL V3.1.6")
