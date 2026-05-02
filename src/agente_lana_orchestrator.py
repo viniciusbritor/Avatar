@@ -473,10 +473,11 @@ class LanaIndustrialEngine:
         else:
             raise Exception("Container Docker não subiu após 30s.")
 
-        # 6. Instalar dependências extras no container (decord para LatentSync)
-        print("[AGNO] [6/8] Instalando decord no container...")
-        _ssh("sudo docker exec lana-engine pip3 install --no-cache-dir decord eva-decord 2>/dev/null || "
-             "sudo docker exec lana-engine pip3 install --no-cache-dir eva-decord 2>/dev/null || true", "DECORD")
+        # 6. Instalar dependências extras no container (necessárias para LatentSync)
+        # Registro de deps: eva-decord (leitura de vídeo), accelerate (HuggingFace),
+        # DeepCache (otimização de difusão)
+        print("[AGNO] [6/8] Instalando deps runtime (eva-decord, accelerate, DeepCache)...")
+        _ssh("sudo docker exec lana-engine pip3 install --no-cache-dir eva-decord accelerate git+https://github.com/horseee/DeepCache.git 2>&1 | tail -3 || true", "DEPS")
 
         # 7. Iniciar API RESTful (comando separado)
         print("[AGNO] [7/8] Subindo API RESTful...")
