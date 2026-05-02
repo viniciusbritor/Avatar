@@ -79,8 +79,8 @@ RUN pip3 install --no-cache-dir --no-build-isolation \
     soundfile==0.12.1 \
     librosa==0.10.2 \
     --extra-index-url https://download.pytorch.org/whl/cu121 && \
-    mkdir -p /usr/local/lib/python3.10/dist-packages/decord && \
-    echo "from eva_decord import *" > /usr/local/lib/python3.10/dist-packages/decord/__init__.py
+    python3 -c "import site; import os; sp=site.getsitepackages()[0]; d=os.path.join(sp,'decord'); os.makedirs(d,exist_ok=True); open(os.path.join(d,'__init__.py'),'w').write('from eva_decord import *')" && \
+    python3 -c "from decord import AudioReader, VideoReader; print('decord OK')"
 
 # ═══════════════════════════════════════════════════════════════════════════
 # LAYER 5: Servidor API — estável, mesma versão do api/requirements.txt
