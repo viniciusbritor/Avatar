@@ -1,0 +1,25 @@
+# ─── Brasil AI Avatar — Cloud Build: L4 Image Only ──────────────────────
+# Disparar quando: mudou Dockerfile L4, requirements-l4.txt, ou deps novas.
+# Tempo estimado: ~20 min (build CUDA image de 15GB)
+
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10'
+      - '-f'
+      - 'infra/Dockerfile.avatar-l4-v2.10'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10'
+
+images:
+  - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
