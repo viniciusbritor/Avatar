@@ -71,14 +71,15 @@ RUN pip3 install --no-cache-dir \
 # ═══════════════════════════════════════════════════════════════════════════
 RUN pip3 install --no-cache-dir --no-build-isolation \
     eva-decord==0.6.1 \
-    git+https://github.com/dmlc/decord.git@v0.6.0 \
+    decord \
     accelerate==0.27.2 \
     kornia==0.7.3 \
     lws==1.2.0 \
     imageio==2.30.0 \
     more-itertools==9.0.0 \
     soundfile==0.12.1 \
-    librosa==0.10.2
+    librosa==0.10.2 \
+    --extra-index-url https://download.pytorch.org/whl/cu121
 
 # ═══════════════════════════════════════════════════════════════════════════
 # LAYER 5: Servidor API — estável, mesma versão do api/requirements.txt
