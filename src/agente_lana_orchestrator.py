@@ -474,17 +474,20 @@ class LanaIndustrialEngine:
             raise Exception("Container Docker não subiu após 30s.")
 
         # 6. Instalar dependências extras no container (necessárias para LatentSync)
-        # Registro de deps runtime:
-        #   eva-decord - leitura de vídeo
-        #   accelerate - HuggingFace distributed inference
-        #   DeepCache  - otimização de cache de difusão
-        #   kornia     - processamento de imagem PyTorch
-        #   lws        - processamento de áudio (whisper)
-        print("[AGNO] [6/8] Instalando deps runtime (eva-decord, accelerate, DeepCache, kornia, lws)...")
-        _ssh("sudo docker exec lana-engine pip3 install --no-cache-dir "
-             "eva-decord accelerate kornia lws 2>&1 | tail -3 || true; "
-             "sudo docker exec lana-engine pip3 install --no-cache-dir "
-             "git+https://github.com/horseee/DeepCache.git 2>&1 | tail -3 || true", "DEPS")
+        print("[AGNO] [6/8] Instalando deps runtime no container...")
+        deps_ok = False
+        for attempt in range(3):
+            res = _ssh("sudo docker exec lana-engine pip3 install --no-cache-dir "
+                       "eva-decord accelerate kornia lws "
+                       "git+https://github.com/horseee/DeepCache.git 2>&1", "DEPS", max_retries=1)
+            if res.returncode == 0:
+                deps_ok = True
+                break
+            print(f"[AGNO] Retry deps ({attempt+1}/3): {res.stderr[-150:] if res.stderr else 'sem erro'}")
+            time.sleep(10)
+        if not deps_ok:
+            # Não é fatal — tentamos seguir em frente
+            print("[AGNO] AVISO: Instalação de deps pode ter falhado. Seguindo mesmo assim.")
 
         # 7. Iniciar API RESTful (comando separado)
         print("[AGNO] [7/8] Subindo API RESTful...")
