@@ -41,19 +41,24 @@ Este documento contém as definições técnicas para operação, manutenção e
 - **Self-Destruction:** Shutdown em 120 minutos (dead man's switch) + Sentinela de inatividade de GPU (30 min).
 
 ## 6. Fixes Aplicados (02/05/2026)
-1. `_find_existing_engines` usa gcloud CLI em vez de biblioteca compute_v1
-2. `_run_ssh_cmd` sem `shell=True`, `echo y |`, `2>NUL`
-3. `--command` sem aspas duplas escapadas (compatível com subprocess lista)
-4. VM purgada em falha do bootstrap (`try/finally` com flag)
-5. Docker image tag padronizada (`avatar-l4:v2.9`)
-6. Engine com auto-detecção Linux/Windows (`CloudLanaEngine` vs `LanaIndustrialEngine`)
-7. Bootstrap com pull de imagem em comando SSH separado (keepalive)
-8. Codebase LatentSync sincronizada do GCS durante bootstrap
-9. Instalação de `eva-decord` no container L4
-10. Orquestrador roda em background thread (não bloqueia Cloud Run)
-11. Uvicorn com 4 workers (API responde a health checks durante orquestração)
+1-11. (ver acima - correções de infraestrutura)
+12. Codebase LatentSync sincronizada do GCS durante bootstrap
+13. Instalação runtime de dependências LatentSync no container L4:
+    - `eva-decord` (leitura de vídeo)
+    - `accelerate` (HuggingFace distributed inference)
+    - `DeepCache` (otimização de difusão via git)
+14. Orquestrador roda em background thread (não bloqueia Cloud Run)
+15. Uvicorn com 4 workers (API responde a health checks durante orquestração)
+16. Docs: Specs.md e ARCHITECTURE.md atualizados
 
-## 7. Checklist de Manutenção
+## 7. Dependências Runtime (instaladas no bootstrap, fora da imagem Docker)
+| Biblioteca | Motivo | Método |
+|---|---|---|
+| `eva-decord` | Leitura de vídeo (substituto do `decord` original) | `pip install eva-decord` |
+| `accelerate` | HuggingFace distributed inference | `pip install accelerate` |
+| `DeepCache` | Otimização de cache para difusão | `pip install git+https://github.com/horseee/DeepCache.git` |
+
+## 8. Checklist de Manutenção
 1. Verificar cotas de GPU L4 anualmente ou em caso de aumento de demanda.
 2. Garantir que a chave `API_SECRET_KEY` no Secret Manager não foi rotacionada sem atualizar a API.
 3. Monitorar a fila `avatar-render-queue` para identificar gargalos de provisionamento.
