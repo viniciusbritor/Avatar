@@ -1,0 +1,75 @@
+flowchart TB
+    subgraph LOCAL["🖥️ Máquina Local"]
+        USER["Usuário"]
+        BRIDGE["sync_bridge.py - Listener Pub/Sub"]
+        SUCESSO["📁 sucesso/"]
+    end
+
+    subgraph GCP["☁️ GCP - brasili-ia-news us-east1"]
+        
+        subgraph SECRETS["🔐 Secret Manager"]
+            E11["ELEVEN_LABS_API_KEY"]
+            DID["DID_BASIC_AUTH"]
+            GEMINI["GOOGLE_API_KEY"]
+        end
+
+        subgraph CR["🌐 Cloud Run - avatar-api"]
+            API["FastAPI + Agno Maestro - POST /produce - 2Gi RAM 2 CPU - timeout 3600s"]
+        end
+
+        subgraph QUEUE["📬 Cloud Tasks"]
+            TASK["avatar-render-queue - deadline 30min - retry automático"]
+        end
+
+        subgraph DB["🗄️ Firestore"]
+            FS["jobs/job_id - queued → running → done"]
+        end
+
+        subgraph GPU["🔥 Compute Engine L4"]
+            VM["g2-standard-12 - NVIDIA L4 24GB VRAM"]
+            DOCKER["🐳 avatar-l4:v2.9 - CUDA + LatentSync - GCS Fuse /mnt/weights"]
+            SENTINEL["⚡ Sentinel Mode - auto-desliga após job"]
+        end
+
+        subgraph STORAGE["📦 Cloud Storage"]
+            BUCKET["brasil-ai-avatars-vault"]
+            OUTPUTS["outputs/"]
+            WEIGHTS["weights/ (GCS Fuse)"]
+            DBFILE["brasil_ai.db"]
+        end
+
+        subgraph PS["📢 Pub/Sub"]
+            TOPIC["avatar-outputs-topic"]
+        end
+
+        subgraph AR["📦 Artifact Registry"]
+            REPO["lana-repo"]
+            IMG1["avatar-api:latest"]
+            IMG2["avatar-l4:v2.9"]
+        end
+
+        subgraph CI["⚙️ Cloud Build"]
+            CB["trigger: push master - machine: N1_HIGHCPU_8"]
+        end
+    end
+
+    USER -->|"POST /produce + X-API-Key"| API
+    SECRETS -->|"injeta"| API
+    API -->|"1. gera áudio ElevenLabs"| API
+    API -->|"2. salva estado"| FS
+    API -->|"3. cria task"| TASK
+    TASK -->|"4. despacha"| API
+    API -->|"5. invoca Maestro caça GPU 13+ zones"| VM
+    VM -->|"roda"| DOCKER
+    DOCKER -->|"monta modelos"| WEIGHTS
+    DOCKER -->|"6. Lip-Sync sobe vídeo"| OUTPUTS
+    OUTPUTS -->|"7. GCS Trigger"| TOPIC
+    TOPIC -->|"8. notifica"| BRIDGE
+    BRIDGE -->|"9. download"| SUCESSO
+    VM -->|"10. self-destruct"| SENTINEL
+
+    CB -->|"build"| IMG1
+    CB -->|"build"| IMG2
+    CB -->|"deploy"| API
+    IMG1 -->|"serve"| CR
+    IMG2 -->|"serve"| GPU
