@@ -613,7 +613,7 @@ class AgenteLanaOrchestrator:
     
     def __init__(self):
         if sys.platform != "win32":
-            from api.cloud_engine import CloudLanaEngine
+            from cloud_engine import CloudLanaEngine
             self.engine = CloudLanaEngine()
         else:
             self.engine = LanaIndustrialEngine()
