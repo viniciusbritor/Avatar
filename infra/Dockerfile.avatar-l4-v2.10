@@ -80,18 +80,7 @@ RUN pip3 install --no-cache-dir --no-build-isolation \
     soundfile==0.12.1 \
     librosa==0.10.2 \
     --extra-index-url https://download.pytorch.org/whl/cu121 && \
-    python3 -c "
-import importlib, shutil, os
-found=None
-for name in ['decord','eva_decord','eva_decord_video','evadecord']:
-    try:
-        m=importlib.import_module(name)
-        found=name; print(f'MODULE_OK: {name}'); break
-    except: pass
-if not found:
-    r=__import__('subprocess').run(['pip','show','-f','eva-decord'],capture_output=True,text=True)
-    print('NO_MODULE:', r.stdout[:500] if r.returncode==0 else r.stderr[:500])
-"
+    python3 -c "import importlib; [print(f'MODULE:{n}') for n in ['decord','eva_decord','eva_decord_video','evadecord'] if __import__('importlib').util.find_spec(n)]" || python3 -c "import subprocess as s; r=s.run(['pip','show','-f','eva-decord'],capture_output=True,text=True); print(r.stdout[:500])"
 
 # ═══════════════════════════════════════════════════════════════════════════
 # LAYER 5: Servidor API — estável, mesma versão do api/requirements.txt
