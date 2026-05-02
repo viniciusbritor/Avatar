@@ -181,6 +181,7 @@ class LanaIndustrialEngine:
             for attempt in range(2):
                 success, error_msg = self._create_gpu_instance(new_name, zone)
                 if success:
+                    bootstrapped = False
                     try:
                         if self._test_ssh(new_name, zone, max_retries=15, progress_callback=progress_callback):
                             self.active_instance = new_name
@@ -188,9 +189,12 @@ class LanaIndustrialEngine:
                             self.current_gpu_type = "L4"
                             self.start_heartbeat()
                             self.bootstrap_v18(is_prebaked=False)
+                            bootstrapped = True
                             return self.get_ip()
                     finally:
-                        if self.active_instance is None:
+                        if not bootstrapped:
+                            self.active_instance = None
+                            self.active_zone = None
                             self._purge_zone(new_name, zone)
                     break # Pula para a próxima zona se o SSH falhou
                 
@@ -373,29 +377,37 @@ class LanaIndustrialEngine:
 
     def bootstrap_v18(self, is_prebaked=False):
         """
-        Bootstrap Cirúrgico e Limpo (Serverless-like).
-        Assume que a imagem Docker (avatar-l4) já contém as dependências pesadas (LatentSync, FastAPI, etc).
-        Apenas sincroniza scripts/assets rápidos do bucket e sobe a API.
+        Bootstrap v3.1.6 — Resiste a pulls longos (>5min).
+        Pull da imagem e run do container são comandos SSH separados para
+        evitar timeout do tunnel IAP durante o download da imagem (~15GB).
         """
         GCS_SCRIPTS = "gs://brasil-ai-avatars-vault/scripts"
         DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.9"
         
-        def _ssh(cmd_str, label="CMD"):
-            """Helper para executar SSH com retry."""
-            cmd = [
-                "gcloud", "compute", "ssh", self.active_instance, "--project", self.project_id,
-                "--zone", self.active_zone, "--tunnel-through-iap", "--command",
-                f"\"{cmd_str}\"", "--quiet"
-            ]
-            res = self._run_ssh_cmd(cmd)
-            if res.returncode != 0:
-                print(f"[AGNO] WARN {label}: {res.stderr[:200]}")
+        def _ssh(cmd_str, label="CMD", max_retries=2):
+            """Helper para executar SSH com retry e keepalive."""
+            for attempt in range(max_retries):
+                cmd = [
+                    "gcloud", "compute", "ssh", self.active_instance, "--project", self.project_id,
+                    "--zone", self.active_zone, "--tunnel-through-iap",
+                    "--ssh-flag=-o ServerAliveInterval=30",
+                    "--ssh-flag=-o ServerAliveCountMax=20",
+                    "--ssh-flag=-o TCPKeepAlive=yes",
+                    "--command", f"\"{cmd_str}\"", "--quiet"
+                ]
+                res = self._run_ssh_cmd(cmd)
+                if res.returncode == 0:
+                    return res
+                err = res.stderr[:200] if res.stderr else "(sem erro)"
+                print(f"[AGNO] WARN {label} (tentativa {attempt+1}/{max_retries}): {err}")
+                if attempt < max_retries - 1:
+                    time.sleep(5)
             return res
 
-        print("\n[AGNO] === INICIANDO BOOTSTRAP LIMPO (V3) ===")
+        print("\n[AGNO] === INICIANDO BOOTSTRAP v3.1.6 ===")
         
         # 1. Preparar filesystem e autenticação
-        print("[AGNO] [1/5] Preparando ambiente...")
+        print("[AGNO] [1/6] Preparando ambiente...")
         for _ in range(3):
             res = _ssh("sudo mkdir -p /workspace/src /workspace/outputs/temp /workspace/latentsync/assets && "
                        "sudo chmod -R 777 /workspace && "
@@ -405,37 +417,53 @@ class LanaIndustrialEngine:
         else:
             raise Exception(f"Falha no setup inicial: {res.stderr}")
 
-        # 2. Sincronizar Assets e Scripts do Bucket (Rápido, 100% Nuvem)
-        print("[AGNO] [2/5] Sincronizando Assets e Scripts (Bucket)...")
+        # 2. Sincronizar Assets e Scripts do Bucket
+        print("[AGNO] [2/6] Sincronizando Assets e Scripts (Bucket)...")
         _ssh(f"gsutil -m cp gs://lana-weights-universal/assets/*.mp4 /workspace/latentsync/assets/ 2>/dev/null || true && "
              f"gsutil -m cp {GCS_SCRIPTS}/* /workspace/ 2>/dev/null || true", "BUCKET_SYNC")
 
-        # 3. Preparar Golden Disk (Modelos grandes montados instantaneamente)
-        print("[AGNO] [3/5] Mapeando Discos de Modelos...")
+        # 3. Preparar Golden Disk
+        print("[AGNO] [3/6] Mapeando Discos de Modelos...")
         _ssh("rm -rf /workspace/latentsync/checkpoints && "
              "ln -sfn /mnt/weights /workspace/latentsync/checkpoints 2>/dev/null || true", "CHECKPOINTS")
 
-        # 4. Pull e Run do Docker (Imagem Imutável)
-        print("[AGNO] [4/5] Iniciando Motor de IA (Docker)...")
+        # 4. Pull da imagem Docker (comando isolado com keepalive — pode levar 5+ min)
+        if not is_prebaked:
+            print("[AGNO] [4/6] Baixando imagem Docker (~15GB, pode levar ate 10min)...")
+            pull_res = _ssh(f"sudo docker pull {DOCKER_IMAGE}", "DOCKER_PULL", max_retries=2)
+            if pull_res.returncode != 0:
+                raise Exception(f"Falha ao baixar imagem Docker: {pull_res.stderr[:300]}")
+            print("[AGNO] Imagem Docker baixada com sucesso.")
+        else:
+            print("[AGNO] [4/6] Imagem pre-baked, pulando pull.")
+
+        # 5. Subir container (comando separado)
+        print("[AGNO] [5/6] Iniciando container Docker...")
         api_key = get_secret("API_SECRET_KEY", fallback="brasilai-avatar-2026")
-        
-        pull_cmd = f"sudo docker pull {DOCKER_IMAGE}; " if not is_prebaked else ""
-        
-        _ssh(f"sudo docker rm -f lana-engine 2>/dev/null; "
-             f"{pull_cmd}"
-             f"sudo docker run -d --name lana-engine --gpus all --network host "
-             f"-e API_SECRET_KEY='{api_key}' "
-             f"-v /workspace:/workspace -v /mnt/weights:/mnt/weights "
-             f"{DOCKER_IMAGE} tail -f /dev/null", "DOCKER")
+        run_res = _ssh(f"sudo docker rm -f lana-engine 2>/dev/null; "
+                       f"sudo docker run -d --name lana-engine --gpus all --network host "
+                       f"-e API_SECRET_KEY='{api_key}' "
+                       f"-v /workspace:/workspace -v /mnt/weights:/mnt/weights "
+                       f"{DOCKER_IMAGE} tail -f /dev/null", "DOCKER_RUN")
+        if run_res.returncode != 0:
+            raise Exception(f"Falha ao subir container Docker: {run_res.stderr[:300]}")
 
-        # 5. Ligar a API RESTful
-        print("[AGNO] [5/5] Subindo API RESTful...")
-        # Imagem v2.9 já possui todas as dependências no PYTHONPATH nativo.
-        _ssh("sudo docker exec -d lana-engine python3 /workspace/industrial_main.py > /workspace/outputs/temp/server.log 2>&1", "SERVER")
+        # Verificar se container subiu
+        for _ in range(6):
+            check = _ssh("sudo docker inspect -f '{{.State.Running}}' lana-engine 2>/dev/null", "CONTAINER_CHECK")
+            if "true" in check.stdout.lower():
+                break
+            time.sleep(5)
+        else:
+            raise Exception("Container Docker não subiu após 30s.")
 
-        # Health Check
+        # 6. Iniciar API RESTful (comando separado)
+        print("[AGNO] [6/6] Subindo API RESTful...")
+        _ssh("sudo docker exec -d lana-engine python3 /workspace/industrial_main.py "
+             "> /workspace/outputs/temp/server.log 2>&1", "SERVER")
+
         print("[AGNO] Aguardando servidor responder (REST API)...")
-        for i in range(24): # 120 segundos total
+        for i in range(24):
             time.sleep(5)
             health_res = _ssh("curl -s --connect-timeout 2 http://localhost:8080/health > /dev/null && echo 'SERVER_OK'", "HEALTH")
             if "SERVER_OK" in health_res.stdout:
