@@ -146,7 +146,7 @@ class LanaIndustrialEngine:
                 self._ensure_server_running()
                 if progress_callback: progress_callback(f"Motor {existing_name} detectado. Verificando disponibilidade...")
                 for _ in range(12):
-                    health_res = self._health_check_via_ssh()
+                    health_res = self._health_check_http()
                     if health_res is not None:
                         if not health_res.get("busy", False):
                             if progress_callback: progress_callback("Motor L4 livre e pronto!")
@@ -266,8 +266,8 @@ class LanaIndustrialEngine:
         return {"error": "MCP Bridge Failure: Todas as tentativas falharam."}
 
     def _run_http_mcp_command(self, method, params):
-        """Faz a chamada HTTP direta para o IP da instância, sem túnel SSH frágil."""
-        ip = self.get_ip()
+        """Faz a chamada HTTP direta para o IP interno da instância (VPC)."""
+        ip = self.get_internal_ip() or self.get_ip()
         if not ip:
             return {"error": "Não foi possível obter o IP da máquina para conexão."}
         
@@ -352,7 +352,7 @@ class LanaIndustrialEngine:
         print("[AGNO] Motor e Servidor acionados.")
 
     def _health_check_via_ssh(self):
-        """Health check do servidor via SSH (bypassa firewall GCP na porta 8080)."""
+        """Health check do servidor via SSH (fallback quando HTTP direto falha)."""
         if not self.active_instance:
             return None
         cmd = [
@@ -369,6 +369,17 @@ class LanaIndustrialEngine:
             except Exception:
                 pass
         return None
+
+    def _health_check_http(self):
+        """Health check HTTP direto via IP interno (VPC, sem firewall)."""
+        ip = self.get_internal_ip()
+        if not ip:
+            return self._health_check_via_ssh()
+        try:
+            res = requests.get(f"http://{ip}:8080/health", timeout=5)
+            return res.json()
+        except Exception:
+            return self._health_check_via_ssh()
 
     def bootstrap_v18(self, is_prebaked=False):
         """
@@ -483,6 +494,26 @@ class LanaIndustrialEngine:
                 return data["networkInterfaces"][0]["accessConfigs"][0]["natIP"]
             except Exception as e:
                 print(f"[SDK] Erro ao extrair IP da resposta JSON: {e}")
+        return None
+
+    def get_internal_ip(self):
+        """Recupera o IP interno da VM (comunicação VPC direta, sem IAP)."""
+        cmd = [
+            "gcloud", "compute", "instances", "describe",
+            self.active_instance,
+            "--project", self.project_id,
+            "--zone", self.active_zone,
+            "--format=json(networkInterfaces[0].networkIP)",
+            "--quiet"
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True,
+                             stdin=subprocess.DEVNULL, encoding="utf-8", errors="ignore")
+        if res.returncode == 0 and res.stdout.strip():
+            try:
+                data = json.loads(res.stdout)
+                return data["networkInterfaces"][0]["networkIP"]
+            except Exception:
+                pass
         return None
 
     def heartbeat(self):
