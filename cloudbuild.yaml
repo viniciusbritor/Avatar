@@ -14,7 +14,7 @@ steps:
     args:
       - 'build'
       - '-t'
-      - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.9'
+      - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10'
       - '-f'
       - 'infra/Dockerfile.avatar-l4-v2.9'
       - '.'
@@ -28,7 +28,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.9'
+      - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10'
 
   # Deploy no Cloud Run
   - name: 'gcr.io/cloud-builders/gcloud'
@@ -54,4 +54,4 @@ images:
 
 options:
   logging: CLOUD_LOGGING_ONLY
-  machineType: 'N1_HIGHCPU_8'
+  machineType: 'E2_HIGHCPU_8'

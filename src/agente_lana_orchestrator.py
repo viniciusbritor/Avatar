@@ -25,7 +25,7 @@ ELEVENLABS_API_KEY = get_secret("ELEVEN_LABS_API_KEY")
 if ELEVENLABS_API_KEY:
     ELEVENLABS_API_KEY = ELEVENLABS_API_KEY.strip()
 VOICE_ID = "XrExE9yKIg1WjnnlVkGX" # Sarah Customizada ElevenLabs (Reference p_5125)
-DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.9"
+        DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10"
 
 class LanaIndustrialEngine:
     """Ferramentas de infraestrutura GCP com Inteligência Maestro V18 (Gold Standard)."""
@@ -382,7 +382,7 @@ class LanaIndustrialEngine:
         evitar timeout do tunnel IAP durante o download da imagem (~15GB).
         """
         GCS_SCRIPTS = "gs://brasil-ai-avatars-vault/scripts"
-        DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.9"
+DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10"
         
         def _ssh(cmd_str, label="CMD", max_retries=2):
             """Helper para executar SSH com retry e keepalive."""
@@ -473,24 +473,8 @@ class LanaIndustrialEngine:
         else:
             raise Exception("Container Docker não subiu após 30s.")
 
-        # 6. Instalar dependências extras no container (necessárias para LatentSync)
-        print("[AGNO] [6/8] Instalando deps runtime no container...")
-        deps_ok = False
-        for attempt in range(3):
-            res = _ssh("sudo docker exec lana-engine pip3 install --no-cache-dir "
-                       "eva-decord accelerate kornia lws "
-                       "git+https://github.com/horseee/DeepCache.git 2>&1", "DEPS", max_retries=1)
-            if res.returncode == 0:
-                deps_ok = True
-                break
-            print(f"[AGNO] Retry deps ({attempt+1}/3): {res.stderr[-150:] if res.stderr else 'sem erro'}")
-            time.sleep(10)
-        if not deps_ok:
-            # Não é fatal — tentamos seguir em frente
-            print("[AGNO] AVISO: Instalação de deps pode ter falhado. Seguindo mesmo assim.")
-
-        # 7. Iniciar API RESTful (comando separado)
-        print("[AGNO] [7/8] Subindo API RESTful...")
+        # 6. Iniciar API RESTful (comando separado)
+        print("[AGNO] [6/7] Subindo API RESTful...")
         _ssh("sudo docker exec -d lana-engine python3 /workspace/industrial_main.py "
              "> /workspace/outputs/temp/server.log 2>&1", "SERVER")
 
