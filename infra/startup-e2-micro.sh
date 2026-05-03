@@ -1,30 +1,32 @@
 #!/bin/bash
-# Lana API Startup Script — VM e2-micro
-# Arquitetura Zero-Cloud-Run: VM fixa 24/7, comunicação HTTP direta na VPC.
+# Lana API Startup — VM e2-micro (v2 — robusto)
+set -x
+exec > /var/log/lana-startup.log 2>&1
 
-echo "--- INICIANDO LANA API (e2-micro) ---"
+echo "=== LANA API BOOT $(date) ==="
 
-# 1. Instalar Docker se não existir
+# 1. Docker
 if ! command -v docker &> /dev/null; then
-    apt-get update
-    apt-get install -y docker.io
+    apt-get update -qq && apt-get install -y -qq docker.io
     systemctl start docker
     systemctl enable docker
 fi
 
-# 2. Autenticar Artifact Registry
+# 2. Auth
 gcloud auth configure-docker us-east1-docker.pkg.dev --quiet
 
-# 3. Pull e rodar container da API
-docker rm -f lana-api 2>/dev/null
-docker pull us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest
+# 3. Pull com retry
+for i in $(seq 1 5); do
+    echo "PULL attempt $i..."
+    docker pull us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest && break
+    sleep 10
+done
 
+# 4. Run
+docker rm -f lana-api 2>/dev/null
 docker run -d --name lana-api \
     --restart unless-stopped \
     --network host \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    -e PORT=8080 \
-    us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest \
-    python3 -m uvicorn api.main:app --host 0.0.0.0 --port 8080 --timeout-keep-alive 3600
+    us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest
 
-echo "--- LANA API PRONTA — porta 8080 ---"
+echo "=== BOOT COMPLETE ==="
