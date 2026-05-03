@@ -164,11 +164,11 @@ def run_inference(job_id, audio_url, template, webhook_url=None):
             "python3", "scripts/inference.py",
             "--unet_config_path", "configs/unet/stage2_512.yaml",
             "--inference_ckpt_path", "/workspace/latentsync/checkpoints/latentsync_unet.pt",
-            "--guidance_scale", "1.5",
+            "--guidance_scale", "2.5",
+            "--num_inference_steps", "40",
             "--video_path", template_video,
             "--audio_path", audio_dest,
             "--video_out_path", video_output,
-            "--seed", "1247"
         ]
         
         log_file = f"{TEMP_DIR}/{job_id}_render.log"
@@ -259,32 +259,40 @@ def download_file(url: str, dest: str):
             f.write(r.content)
 
 def poll_pending_jobs():
-    """Polling inicial: busca jobs 'queued' no Firestore e processa."""
-    try:
-        db = firestore.Client(project="brasili-ia-news")
-        docs = list(db.collection("avatar_jobs")
-                    .where("status", "==", "queued")
-                    .limit(5).stream())
-        if not docs:
-            print("[STARTUP] Nenhum job pendente.")
-            return
-        print(f"[STARTUP] {len(docs)} job(s) pendente(s). Iniciando processamento...")
-        for doc in docs:
-            job = doc.to_dict()
-            job_id = job.get("job_id", doc.id)
-            audio_url = job.get("audio_url", "")
-            presenter = job.get("presenter_id", "default")
-            webhook_url = job.get("webhook_url", "")
-            if not audio_url:
-                print(f"[STARTUP] Job {job_id} sem audio_url, ignorando.")
+    """Polling continuo: busca jobs 'queued' no Firestore e processa."""
+    global IS_BUSY
+    print("[POLLER] Iniciando watcher de jobs...")
+    while True:
+        try:
+            if IS_BUSY:
+                time.sleep(10)
                 continue
-            threading.Thread(
-                target=run_inference_wrapper,
-                args=(job_id, audio_url, presenter, webhook_url),
-                daemon=True
-            ).start()
-    except Exception as e:
-        print(f"[STARTUP] Erro no polling Firestore: {e}")
+            db = firestore.Client(project="brasili-ia-news")
+            docs = list(db.collection("avatar_jobs")
+                        .where("status", "==", "queued")
+                        .limit(10).stream())
+            for doc in docs:
+                job = doc.to_dict()
+                job_id = job.get("job_id", doc.id)
+                audio_url = job.get("audio_url", "")
+                if not audio_url:
+                    continue
+                if IS_BUSY:
+                    break
+                db.collection("avatar_jobs").document(job_id).update({"status": "running"})
+                IS_BUSY = True
+                print(f"[POLLER] Job encontrado: {job_id}. Iniciando render...")
+                presenter = job.get("presenter_id", "default")
+                webhook_url = job.get("webhook_url", "")
+                threading.Thread(
+                    target=run_inference_wrapper,
+                    args=(job_id, audio_url, presenter, webhook_url),
+                    daemon=True
+                ).start()
+                break
+        except Exception as e:
+            print(f"[POLLER] Erro: {e}")
+        time.sleep(10)
 
 @app.on_event("startup")
 def on_startup():
