@@ -9,6 +9,8 @@ Fluxo:
 
 import os
 import uuid
+import subprocess
+import threading
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -73,9 +75,73 @@ def health():
     }
 
 
+def _spawn_gpu():
+    """Background: liga ou cria VM L4. Sem SSH, sem bootstrap wait."""
+    L4_MACHINE = "g2-standard-12"
+    IMAGE_FAMILY = "common-cu129-ubuntu-2204-nvidia-580"
+    IMAGE_PROJECT = "deeplearning-platform-release"
+    ZONES = ["us-east1-c", "us-west4-a", "us-east1-d", "us-east4-a", "us-west1-a",
+             "us-central1-a", "us-east5-a", "us-south1-a", "europe-west4-a",
+             "europe-west1-b", "europe-west6-b", "asia-east1-a",
+             "northamerica-northeast1-b"]
+    PROJECT = "brasili-ia-news"
+
+    import uuid as _uuid
+
+    try:
+        existing = subprocess.run(
+            ["gcloud", "compute", "instances", "list",
+             "--filter=name~lana-engine- AND status=RUNNING",
+             "--format=json", "--project", PROJECT, "--quiet"],
+            capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=30
+        )
+        if existing.returncode == 0 and existing.stdout.strip():
+            import json as _json
+            instances = _json.loads(existing.stdout)
+            if instances:
+                inst = sorted(instances, key=lambda x: x['name'], reverse=True)[0]
+                name, zone = inst['name'], inst['zone'].split('/')[-1]
+                print(f"[SPAWN] Reusando GPU: {name} em {zone}")
+                subprocess.run(
+                    ["gcloud", "compute", "instances", "start", name,
+                     "--project", PROJECT, "--zone", zone, "--quiet"],
+                    capture_output=True, stdin=subprocess.DEVNULL, timeout=30
+                )
+                return
+
+        for zone in ZONES:
+            name = f"lana-engine-l4-{int(__import__('time').time())}-{_uuid.uuid4().hex[:4]}"
+            print(f"[SPAWN] Criando {name} em {zone}...")
+            res = subprocess.run(
+                ["gcloud", "compute", "instances", "create", name,
+                 "--project", PROJECT, "--zone", zone,
+                 f"--machine-type={L4_MACHINE}",
+                 f"--image-family={IMAGE_FAMILY}",
+                 f"--image-project={IMAGE_PROJECT}",
+                 "--accelerator=type=nvidia-l4,count=1",
+                 "--boot-disk-size=150GB",
+                 "--provisioning-model=STANDARD",
+                 "--maintenance-policy=TERMINATE",
+                 "--metadata-from-file=startup-script=/app/infra/startup_arch4.sh",
+                 "--scopes=cloud-platform", "--quiet"],
+                capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=60
+            )
+            if res.returncode == 0:
+                print(f"[SPAWN] GPU criada: {name} em {zone}")
+                return
+            if "Quota" in (res.stderr or "") or "GPUS_ALL_REGIONS" in (res.stderr or ""):
+                print(f"[SPAWN] Quota cheia em {zone}, tentando proxima...")
+                continue
+            if "stockout" in (res.stderr or "").lower() or "resource" in (res.stderr or "").lower():
+                continue
+        print("[SPAWN] Nenhuma zona disponivel para GPU L4.")
+    except Exception as e:
+        print(f"[SPAWN] Erro: {e}")
+
+
 @app.post("/produce")
 async def produce(request: Request, payload: ProduceRequest, x_api_key: str = Header(...)):
-    """Enfileira producao: gera audio, salva Firestore, inicia GPU L4."""
+    """Enfileira producao: gera audio, salva Firestore, dispara GPU L4."""
     _check_key(x_api_key)
 
     if not db:
@@ -99,30 +165,22 @@ async def produce(request: Request, payload: ProduceRequest, x_api_key: str = He
         "job_id": job_id,
         "status": "queued",
         "text": payload.text,
-        "audio_url": f"gs://{orchestrator.engine.bucket_name}/{audio_gcs.split('/')[-2]}/{audio_gcs.split('/')[-1]}" if hasattr(orchestrator.engine, 'bucket_name') else audio_gcs,
+        "audio_url": f"gs://brasil-ai-avatars-vault/temp/{os.path.basename(audio_local)}",
         "webhook_url": webhook_url,
         "created_at": datetime.now(BRT).isoformat(),
         "video_path": None,
         "completed_at": None,
-        "message": "Enfileirado. GPU L4 processara em breve."
+        "message": "Enfileirado. GPU L4 iniciando..."
     }
 
     JOBS_COLLECTION.document(job_id).set(job_data)
 
-    try:
-        orchestrator.engine.ensure_instance_ready(
-            progress_callback=lambda m: print(f"[ORQ] {m}")
-        )
-    except Exception as e:
-        print(f"[ORQ] Aviso: GPU nao iniciada: {e}")
-        JOBS_COLLECTION.document(job_id).update({
-            "message": f"GPU pendente: {str(e)[:100]}"
-        })
+    threading.Thread(target=_spawn_gpu, daemon=True).start()
 
     return JSONResponse(content={
         "job_id": job_id,
         "status": "queued",
-        "message": f"Job {job_id} enfileirado. GPU L4 sera iniciada.",
+        "message": f"Job {job_id} enfileirado. GPU sera iniciada.",
         "created_at": job_data["created_at"]
     })
 
