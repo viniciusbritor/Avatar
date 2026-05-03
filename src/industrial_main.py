@@ -164,8 +164,8 @@ def run_inference(job_id, audio_url, template, webhook_url=None):
             "python3", "scripts/inference.py",
             "--unet_config_path", "configs/unet/stage2_512.yaml",
             "--inference_ckpt_path", "/workspace/latentsync/checkpoints/latentsync_unet.pt",
-            "--guidance_scale", "1.5",
-            "--inference_steps", "20",
+            "--guidance_scale", "2.0",
+            "--inference_steps", "30",
             "--enable_deepcache",
             "--video_path", template_video,
             "--audio_path", audio_dest,
@@ -311,7 +311,7 @@ def poll_pending_jobs():
                 cooldown_count = 0
                 found = True
                 print(f"[POLLER] Job {job_id} iniciado. Cooldown de {COOLDOWN_MAX*10//60}min apos termino.")
-                presenter = job.get("presenter_id", "default")
+                presenter = job.get("presenter_id", "lana_comentario")
                 webhook_url = job.get("webhook_url", "")
                 threading.Thread(
                     target=run_inference_wrapper,

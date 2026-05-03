@@ -24,7 +24,7 @@ L4_MACHINE = "g2-standard-12"
 ELEVENLABS_API_KEY = get_secret("ELEVEN_LABS_API_KEY")
 if ELEVENLABS_API_KEY:
     ELEVENLABS_API_KEY = ELEVENLABS_API_KEY.strip()
-VOICE_ID = "XrExE9yKIg1WjnnlVkGX" # Sarah Customizada ElevenLabs (Reference p_5125)
+VOICE_ID = "XrExE9yKIg1WjnnlVkGX" # Matilda customizada (voz Brasil-AI)
 DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden"
 
 class LanaIndustrialEngine:
@@ -692,7 +692,7 @@ class AgenteLanaOrchestrator:
         try:
             job_res = self.engine.call_mcp_tool("create_render_job", {
                 "audio_url": audio_gcs_url,
-                "presenter_id": "default",
+                "presenter_id": "lana_comentario",
                 "webhook_url": webhook_url,
                 "job_id": job_id
             })
