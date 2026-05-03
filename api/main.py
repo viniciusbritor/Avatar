@@ -76,7 +76,7 @@ def health():
 
 
 def _spawn_gpu():
-    """Background: liga ou cria VM L4. Sem SSH, sem bootstrap wait."""
+    """Background: liga ou cria VM L4 com retry 3x. Sem SSH."""
     L4_MACHINE = "g2-standard-12"
     IMAGE_FAMILY = "common-cu129-ubuntu-2204-nvidia-580"
     IMAGE_PROJECT = "deeplearning-platform-release"
@@ -87,56 +87,57 @@ def _spawn_gpu():
     PROJECT = "brasili-ia-news"
 
     import uuid as _uuid
+    import time as _time
 
-    try:
-        existing = subprocess.run(
-            ["gcloud", "compute", "instances", "list",
-             "--filter=name~lana-engine- AND status=RUNNING",
-             "--format=json", "--project", PROJECT, "--quiet"],
-            capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=30
-        )
-        if existing.returncode == 0 and existing.stdout.strip():
-            import json as _json
-            instances = _json.loads(existing.stdout)
-            if instances:
-                inst = sorted(instances, key=lambda x: x['name'], reverse=True)[0]
-                name, zone = inst['name'], inst['zone'].split('/')[-1]
-                print(f"[SPAWN] Reusando GPU: {name} em {zone}")
-                subprocess.run(
-                    ["gcloud", "compute", "instances", "start", name,
-                     "--project", PROJECT, "--zone", zone, "--quiet"],
-                    capture_output=True, stdin=subprocess.DEVNULL, timeout=30
-                )
-                return
-
-        for zone in ZONES:
-            name = f"lana-engine-l4-{int(__import__('time').time())}-{_uuid.uuid4().hex[:4]}"
-            print(f"[SPAWN] Criando {name} em {zone}...")
-            res = subprocess.run(
-                ["gcloud", "compute", "instances", "create", name,
-                 "--project", PROJECT, "--zone", zone,
-                 f"--machine-type={L4_MACHINE}",
-                 f"--image-family={IMAGE_FAMILY}",
-                 f"--image-project={IMAGE_PROJECT}",
-                 "--accelerator=type=nvidia-l4,count=1",
-                 "--boot-disk-size=150GB",
-                 "--provisioning-model=STANDARD",
-                 "--maintenance-policy=TERMINATE",
-                 "--metadata-from-file=startup-script=/app/infra/startup_arch4.sh",
-                 "--scopes=cloud-platform", "--quiet"],
-                capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=60
+    for attempt in range(3):
+        try:
+            existing = subprocess.run(
+                ["gcloud", "compute", "instances", "list",
+                 "--filter=name~lana-engine- AND status=RUNNING",
+                 "--format=json", "--project", PROJECT, "--quiet", "--verbosity=none"],
+                capture_output=True, text_input=True, timeout=90
             )
-            if res.returncode == 0:
-                print(f"[SPAWN] GPU criada: {name} em {zone}")
-                return
-            if "Quota" in (res.stderr or "") or "GPUS_ALL_REGIONS" in (res.stderr or ""):
-                print(f"[SPAWN] Quota cheia em {zone}, tentando proxima...")
-                continue
-            if "stockout" in (res.stderr or "").lower() or "resource" in (res.stderr or "").lower():
-                continue
-        print("[SPAWN] Nenhuma zona disponivel para GPU L4.")
-    except Exception as e:
-        print(f"[SPAWN] Erro: {e}")
+            if existing.returncode == 0 and existing.stdout.strip():
+                import json as _json
+                instances = _json.loads(existing.stdout)
+                if instances:
+                    inst = sorted(instances, key=lambda x: x['name'], reverse=True)[0]
+                    name, zone = inst['name'], inst['zone'].split('/')[-1]
+                    print(f"[SPAWN] GPU ja ativa: {name} em {zone}")
+                    return
+
+            for zone in ZONES:
+                name = f"lana-engine-l4-{int(_time.time())}-{_uuid.uuid4().hex[:4]}"
+                print(f"[SPAWN] Tentativa {attempt+1}/3 — Criando {name} em {zone}...")
+                res = subprocess.run(
+                    ["gcloud", "compute", "instances", "create", name,
+                     "--project", PROJECT, "--zone", zone,
+                     f"--machine-type={L4_MACHINE}",
+                     f"--image-family={IMAGE_FAMILY}",
+                     f"--image-project={IMAGE_PROJECT}",
+                     "--accelerator=type=nvidia-l4,count=1",
+                     "--boot-disk-size=150GB",
+                     "--provisioning-model=STANDARD",
+                     "--maintenance-policy=TERMINATE",
+                     "--metadata-from-file=startup-script=/app/infra/startup_arch4.sh",
+                     "--scopes=cloud-platform", "--quiet", "--verbosity=none"],
+                    capture_output=True, text_input=True, timeout=120
+                )
+                if res.returncode == 0:
+                    print(f"[SPAWN] GPU criada: {name} em {zone}")
+                    return
+                err = (res.stderr or "")[:200]
+                if "Quota" in err or "GPUS_ALL_REGIONS" in err:
+                    print(f"[SPAWN] Cota cheia em {zone}, tentando proxima zona...")
+                    continue
+                if "stockout" in err.lower() or "resource" in err.lower() or "ZONE_RESOURCE_POOL_EXHAUSTED" in err:
+                    continue
+                print(f"[SPAWN] Erro em {zone}: {err}")
+        except Exception as e:
+            print(f"[SPAWN] Erro tentativa {attempt+1}: {e}")
+        if attempt < 2:
+            _time.sleep(30)
+    print("[SPAWN] GPU L4 nao encontrada apos 3 tentativas.")
 
 
 @app.post("/produce")
