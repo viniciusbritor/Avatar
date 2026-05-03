@@ -95,7 +95,7 @@ def _spawn_gpu():
                 ["gcloud", "compute", "instances", "list",
                  "--filter=name~lana-engine- AND status=RUNNING",
                  "--format=json", "--project", PROJECT, "--quiet", "--verbosity=none"],
-                capture_output=True, text_input=True, timeout=90
+                capture_output=True, text=True, timeout=90
             )
             if existing.returncode == 0 and existing.stdout.strip():
                 import json as _json
@@ -121,7 +121,7 @@ def _spawn_gpu():
                      "--maintenance-policy=TERMINATE",
                      "--metadata-from-file=startup-script=/app/infra/startup_arch4.sh",
                      "--scopes=cloud-platform", "--quiet", "--verbosity=none"],
-                    capture_output=True, text_input=True, timeout=120
+                    capture_output=True, text=True, timeout=120
                 )
                 if res.returncode == 0:
                     print(f"[SPAWN] GPU criada: {name} em {zone}")
