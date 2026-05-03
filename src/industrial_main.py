@@ -259,18 +259,42 @@ def download_file(url: str, dest: str):
             f.write(r.content)
 
 def poll_pending_jobs():
-    """Polling continuo: busca jobs 'queued' no Firestore e processa."""
+    """Polling continuo com auto-shutdown: idle 15min, after-job 5min, dead man 120min."""
     global IS_BUSY
-    print("[POLLER] Iniciando watcher de jobs...")
+    print("[POLLER] Iniciando watcher de jobs (shutdown: idle=15min, after-job=5min)...")
+    idle_count = 0
+    MAX_IDLE = 90  # 90 × 10s = 15 min
+    cooldown = False
+    cooldown_count = 0
+    COOLDOWN_MAX = 30  # 30 × 10s = 5 min
+
     while True:
         try:
             if IS_BUSY:
                 time.sleep(10)
                 continue
+
+            if cooldown:
+                cooldown_count += 1
+                if cooldown_count >= COOLDOWN_MAX:
+                    remaining = list(db.collection("avatar_jobs")
+                                     .where("status", "==", "queued").limit(1).stream())
+                    if not remaining:
+                        print(f"[POLLER] {COOLDOWN_MAX*10//60}min sem novos jobs. Desligando GPU...")
+                        os.system("sudo shutdown -h now")
+                        break
+                    else:
+                        print("[POLLER] Novos jobs detectados. Cancelando cooldown.")
+                        cooldown = False
+                        cooldown_count = 0
+                time.sleep(10)
+                continue
+
             db = firestore.Client(project="brasili-ia-news")
             docs = list(db.collection("avatar_jobs")
                         .where("status", "==", "queued")
                         .limit(10).stream())
+            found = False
             for doc in docs:
                 job = doc.to_dict()
                 job_id = job.get("job_id", doc.id)
@@ -281,7 +305,11 @@ def poll_pending_jobs():
                     break
                 db.collection("avatar_jobs").document(job_id).update({"status": "running"})
                 IS_BUSY = True
-                print(f"[POLLER] Job encontrado: {job_id}. Iniciando render...")
+                idle_count = 0
+                cooldown = True
+                cooldown_count = 0
+                found = True
+                print(f"[POLLER] Job {job_id} iniciado. Cooldown de {COOLDOWN_MAX*10//60}min apos termino.")
                 presenter = job.get("presenter_id", "default")
                 webhook_url = job.get("webhook_url", "")
                 threading.Thread(
@@ -290,6 +318,14 @@ def poll_pending_jobs():
                     daemon=True
                 ).start()
                 break
+
+            if not found:
+                idle_count += 1
+                if idle_count >= MAX_IDLE:
+                    print(f"[POLLER] {MAX_IDLE*10//60} min ocioso. Desligando GPU...")
+                    os.system("sudo shutdown -h now")
+                    break
+
         except Exception as e:
             print(f"[POLLER] Erro: {e}")
         time.sleep(10)
