@@ -165,7 +165,7 @@ def run_inference(job_id, audio_url, template, webhook_url=None):
             "--unet_config_path", "configs/unet/stage2_512.yaml",
             "--inference_ckpt_path", "/workspace/latentsync/checkpoints/latentsync_unet.pt",
             "--guidance_scale", "2.5",
-            "--num_inference_steps", "40",
+            "--inference_steps", "40",
             "--video_path", template_video,
             "--audio_path", audio_dest,
             "--video_out_path", video_output,

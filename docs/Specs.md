@@ -1,74 +1,77 @@
-# Especificações Técnicas Operacionais — Avatar v3.1.6-r2
+# Especificacoes Tecnicas Operacionais — Avatar v3.2.0
 
-Este documento contém as definições técnicas para operação, manutenção e escalonamento do ecossistema.
+## 1. API (Cerebro)
+- **Host:** VM e2-micro `lana-api` (us-east1-b)
+- **URL:** `http://35.237.48.76:8080` (IP efemero, verificar ao recriar VM)
+- **Endpoints:**
+    - `POST /produce`: Enfileira producao (TTS + Firestore + spawn GPU)
+    - `GET /status/{job_id}`: Consulta estado no Firestore
+    - `GET /health`: Diagnostico da API
+    - `POST /webhook/render-complete`: Callback da GPU
+- **Tempo de resposta:** ~5-8s (fire-and-forget, nao espera GPU)
+- **Entrypoint:** `api/entrypoint.sh` — ADC nativo, sem gcloud auth manual
+- **Workers:** 1 uvicorn worker (e2-micro: 2 vCPU, 1 GB RAM)
 
-## 1. Definições de API (Cérebro)
-- **URL Base:** `https://avatar-api-ckzdqzo75q-ue.a.run.app`
-- **Cloud Run Revision Atual:** `avatar-api-00071`
-- **Endpoints Principais:**
-    - `POST /produce`: Início do processo assíncrono.
-    - `GET /status/{job_id}`: Consulta estado no Firestore.
-    - `GET /health`: Diagnóstico de infraestrutura.
-    - `POST /webhook/render-complete`: Ponto de retorno da GPU.
-    - `POST /internal/render-worker`: Worker exclusivo do Cloud Tasks (roda orquestração em background thread).
+## 2. GPU (Motor)
+- **Hardware:** `g2-standard-12` (NVIDIA L4, 22 GB VRAM)
+- **Spawn:** `_spawn_gpu()` em background thread, retry 3x, 13 zonas
+- **Auto-bootstrap:** `startup_arch4.sh` — Docker, NVIDIA, GCS Fuse, pull imagem, run container
+- **Auto-orquestra:** `industrial_main.py` faz polling Firestore continuo (10s)
+- **Render:** `guidance_scale=2.5`, `inference_steps=40`, seed aleatorio, mascara dilatada 7px
+- **Shutdown:** Dead man's switch 120 min (startup script) + idle via poller (a implementar)
 
-## 2. Configurações de Nuvem (GCP)
-- **Projeto:** `brasili-ia-news` (ID: `180096224219`)
-- **Região Primária:** `us-east1`
-- **VPC / Rede:** `default` (com acesso IAP para SSH).
-- **Service Account (API):** `avatar-api-sa@brasili-ia-news.iam.gserviceaccount.com`
-  - Permissões: Compute Admin, Cloud Tasks Enqueuer, Secret Manager Accessor, Firestore User.
-- **Cloud Tasks Queue:** `avatar-render-queue` (us-east1, dispatch deadline: 1800s)
-- **Firestore Collection:** `avatar_jobs`
+## 3. GCP
+- **Projeto:** `brasili-ia-news`
+- **Regiao:** `us-east1`
+- **VPC:** `default`
+- **VM API SA:** `180096224219-compute@developer.gserviceaccount.com`
+- **GPU SA:** mesma (compute default)
+- **Firestore:** `avatar_jobs`
+- **GCS Vault:** `gs://brasil-ai-avatars-vault`
+- **GCS Weights:** `gs://lana-weights-universal` (GCS Fuse em `/mnt/weights`)
 
-## 3. Imagens Docker Oficiais (Artifact Registry)
-- **API Image:** `us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest`
-  - Dockerfile: `api/Dockerfile` (Python 3.11-slim + gcloud CLI + FastAPI)
-  - Entrypoint: `api/entrypoint.sh` (autentica via Secret Manager, sobe uvicorn com 4 workers)
-- **Worker Image:** `us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10`
-  - Dockerfile: `infra/Dockerfile.avatar-l4-v2.10` (CUDA 12.1 + PyTorch + todas deps LatentSync + código do projeto)
-  - Arquitetura de layers otimizada: apt → torch → deps → código (cache eficiente)
+## 4. Imagens Docker (Artifact Registry)
+- **API:** `avatar-api:latest` (Python 3.11-slim + gcloud CLI + FastAPI)
+- **GPU:** `avatar-l4:v2.10-golden` (CUDA 12.1 + LatentSync submodule + todas deps)
+  - Dockerfile: `infra/Dockerfile.avatar-l4-v2.10-golden`
+  - Fonte LatentSync: `latentsync/` (git submodule `bytedance/LatentSync`)
+  - Patches: `decord`→`eva-decord`, `DeepCache` do git, mascara dilatada
 
-## 4. O Agente de Ponte (Local Bridge)
+## 5. Local Bridge
 - **Script:** `src/sync_bridge.py`
-- **Tecnologia:** Polling no Firestore (sem dependência de Pub/Sub).
-- **Missão:** Download automático via trigger.
-- **Configuração:** Rodar sob demanda na máquina do usuário.
-- **Modos:**
-    - `python sync_bridge.py` — polling contínuo (5s)
-    - `python sync_bridge.py --once` — processa pendentes e sai
-    - `python sync_bridge.py --watch 30` — intervalo customizado
+- **Modo:** Polling Firestore (sem Pub/Sub)
+- **Download:** `gsutil cp` direto (ADC nao configurado localmente)
 
-## 5. FinOps & Custos (Zero-Waste)
-- **Cloud Run:** Cobrança apenas por requisição.
-- **Compute Engine (L4):** `g2-standard-12` — Cobrança por segundo de uso (~$0.70/h).
-- **GCS Fuse:** Evita custos de tráfego interno ao não baixar pesos de modelos entre regiões (Streaming).
-- **Self-Destruction:** Shutdown em 120 minutos (dead man's switch) + Sentinela de inatividade de GPU (30 min).
+## 6. FinOps & Custos
+| Recurso | Custo |
+|---|---|
+| VM e2-micro (24/7) | ~$6/mes |
+| GPU L4 (sob demanda) | ~$0.70/h |
+| Dead man's switch | 120 min max |
+| Idle shutdown | A implementar (15 min) |
 
-## 6. Fixes Aplicados (02/05/2026)
-1-15. (ver acima - correções de infraestrutura)
-16. **v2.10:** Imagem L4 refatorada com layers otimizadas e cache eficiente
-17. Todas as dependências LatentSync baked na imagem (sem pip install runtime)
-18. Código do projeto (industrial_main.py, lipsync_pipeline.py) incluso na imagem L4
-19. Bootstrap simplificado: sem downloads GCS de scripts, sem instalações pip
-20. DOCKER_IMAGE consolidado (tag única v2.10), cloudbuild.yaml consistente
-
-## 7. Estrutura do Dockerfile L4 (v2.10)
-| Layer | Conteúdo | Quando rebuilda |
+## 7. CI/CD
+| YAML | Proposito | Tempo |
 |---|---|---|
-| 1. apt | ffmpeg, python3.10, git, libsndfile | Raramente |
-| 2. PyTorch | torch + torchvision + torchaudio CUDA 12.1 | Upgrade CUDA/PyTorch |
-| 3. ML Core | diffusers, transformers, insightface, onnxruntime | Upgrade de versões |
-| 4. LatentSync Deps | eva-decord, accelerate, kornia, lws, imageio | Feature nova |
-| 5. Servidor API | fastapi, uvicorn, google-cloud-storage | Raramente |
-| 6. DeepCache | git+https://github.com/horseee/DeepCache.git | Mudança no upstream |
-| 7. CÓDIGO | src/ (industrial_main, lipsync_pipeline, secrets_manager) | A CADA COMMIT (~5s) |
+| `cloudbuild-api.yaml` | Build + push API | ~5 min |
+| `cloudbuild-l4-golden.yaml` | Build golden L4 | ~20 min |
+| `cloudbuild-l4.yaml` | Build L4 (antigo) | ~15 min |
+| `cloudbuild-all.yaml` | Ambos | ~25 min |
+| `cloudbuild-api-only.yaml` | API legado (Cloud Run) | Deprecated |
 
-## 8. Checklist de Manutenção
-1. Verificar cotas de GPU L4 anualmente ou em caso de aumento de demanda.
-2. Garantir que a chave `API_SECRET_KEY` no Secret Manager não foi rotacionada sem atualizar a API.
-3. Monitorar a fila `avatar-render-queue` para identificar gargalos de provisionamento.
-4. Atualizar codebase LatentSync no bucket `gs://brasil-ai-avatars-vault/latentsync/` quando houver updates no repositório upstream.
+## 8. Parametros de Render (v2.10)
+| Parametro | Valor | Efeito |
+|---|---|---|
+| `guidance_scale` | 2.5 | Fidelidade boca-audio |
+| `inference_steps` | 40 | Qualidade da difusao |
+| `seed` | aleatorio | Variacao natural |
+| `mascara` | dilatada 7px | Transicao boca-rosto |
+
+## 9. Checklist
+1. GPU rodando? `gcloud compute instances list --filter="name~lana-engine-"`
+2. VM API online? `curl http://35.237.48.76:8080/health`
+3. Fila de jobs? Firestore console > `avatar_jobs`
+4. Custos? `gcloud compute instances list` — desligar GPUs ociosas
 
 ---
-*Status: Industrial v3.1.6-r2 — Layers otimizadas, deps baked, bootstrap simplificado.*
+*Status: Industrial v3.2.0 — VM e2-micro, golden image, fire-and-forget, GPU auto-orquestravel.*
