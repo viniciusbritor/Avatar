@@ -16,7 +16,10 @@ if ! command -v docker &> /dev/null; then
     systemctl enable docker
 fi
 
-# 2. Pull com retry
+# 2. Auth Artifact Registry
+gcloud auth configure-docker us-east1-docker.pkg.dev --quiet
+
+# 3. Pull com retry
 for i in $(seq 1 5); do
     echo "PULL attempt $i..."
     docker pull us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest && break
