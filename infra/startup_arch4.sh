@@ -47,8 +47,35 @@ mkdir -p /workspace
 chmod 777 /workspace
 
 # 6. CONFIGURAR DOCKER AUTH (Artifact Registry)
-# Isso permite que o docker pull funcione sem intervenção manual
-# Nota: A VM precisa ter o escopo cloud-platform ativado na criação.
 gcloud auth configure-docker us-east1-docker.pkg.dev --quiet
 
-echo "--- BOOT FINALIZADO: PRONTO PARA PRODUÇÃO ---"
+# 7. PULL GOLDEN IMAGE L4 (com retry, ~15GB)
+echo "--- PULL IMAGEM L4 GOLDEN ---"
+for i in $(seq 1 5); do
+    echo "PULL attempt $i..."
+    docker pull us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden && break
+    sleep 15
+done
+
+# 8. SYNC ASSETS (videos de avatar)
+echo "--- SYNC ASSETS ---"
+mkdir -p /workspace/latentsync/assets
+gsutil -m cp gs://lana-weights-universal/assets/*.mp4 /workspace/latentsync/assets/ 2>/dev/null || true
+rm -rf /workspace/latentsync/checkpoints
+ln -sfn /mnt/weights /workspace/latentsync/checkpoints
+chmod -R 777 /workspace
+
+# 9. RUN CONTAINER (modo passivo, espera job)
+echo "--- INICIANDO CONTAINER L4 ---"
+API_KEY=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/api-key 2>/dev/null || echo "brasilai-avatar-2026")
+docker rm -f lana-engine 2>/dev/null
+docker run -d --name lana-engine \
+    --gpus all \
+    --network host \
+    -e API_SECRET_KEY="$API_KEY" \
+    -v /workspace:/workspace \
+    -v /mnt/weights:/mnt/weights \
+    us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden \
+    python3 /workspace/src/industrial_main.py
+
+echo "--- BOOT FINALIZADO: GPU PRONTA PARA PRODUCAO ---"
