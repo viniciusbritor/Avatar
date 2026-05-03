@@ -376,8 +376,8 @@ class LipsyncPipeline(DiffusionPipeline):
         device = self._execution_device
         mask_image = load_fixed_mask(height, mask_image_path)
         mask_np = mask_image[0].cpu().numpy()
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
-        mask_np = cv2.dilate(mask_np, kernel, iterations=1)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        mask_np = cv2.erode(mask_np, kernel, iterations=1)
         mask_image = rearrange(torch.from_numpy(mask_np), "h w -> 1 h w").to(device=device, dtype=weight_dtype)
         self.image_processor = ImageProcessor(height, device="cuda", mask_image=mask_image)
         self.set_progress_bar_config(desc=f"Sample frames: {num_frames}")
