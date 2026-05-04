@@ -24,7 +24,7 @@ L4_MACHINE = "g2-standard-12"
 ELEVENLABS_API_KEY = get_secret("ELEVEN_LABS_API_KEY")
 if ELEVENLABS_API_KEY:
     ELEVENLABS_API_KEY = ELEVENLABS_API_KEY.strip()
-VOICE_ID = "XrExE9yKIg1WjnnlVkGX" # Matilda customizada (voz Brasil-AI)
+VOICE_ID = "OjcGK1RXdMD1PFj2eIuN" # Larissa (voz Brasil-AI nativa)
 DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden"
 
 class LanaIndustrialEngine:
