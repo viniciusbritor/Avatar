@@ -277,17 +277,17 @@ def poll_pending_jobs():
 
             if cooldown:
                 cooldown_count += 1
+                remaining = list(db.collection("avatar_jobs")
+                                 .where("status", "==", "queued").limit(1).stream())
+                if remaining:
+                    print("[POLLER] Novo job durante cooldown. Cancelando.")
+                    cooldown = False
+                    cooldown_count = 0
+                    continue
                 if cooldown_count >= COOLDOWN_MAX:
-                    remaining = list(db.collection("avatar_jobs")
-                                     .where("status", "==", "queued").limit(1).stream())
-                    if not remaining:
-                        print(f"[POLLER] {COOLDOWN_MAX*10//60}min sem novos jobs. Desligando GPU...")
-                        os.system("sudo shutdown -h now")
-                        break
-                    else:
-                        print("[POLLER] Novos jobs detectados. Cancelando cooldown.")
-                        cooldown = False
-                        cooldown_count = 0
+                    print(f"[POLLER] {COOLDOWN_MAX*10//60}min sem jobs. Desligando GPU...")
+                    os.system("sudo shutdown -h now")
+                    break
                 time.sleep(10)
                 continue
 
