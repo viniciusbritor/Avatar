@@ -46,8 +46,11 @@ gcsfuse -o allow_other --only-dir checkpoints lana-weights-universal /mnt/weight
 mkdir -p /workspace
 chmod 777 /workspace
 
-# 6. CONFIGURAR DOCKER AUTH (Artifact Registry)
-gcloud auth configure-docker us-east1-docker.pkg.dev --quiet
+# 6. CONFIGURAR DOCKER AUTH (Artifact Registry) — com retry
+for i in $(seq 1 10); do
+    gcloud auth configure-docker us-east1-docker.pkg.dev --quiet && break
+    sleep 6
+done
 
 # 7. PULL GOLDEN IMAGE L4 (com retry, ~15GB)
 echo "--- PULL IMAGEM L4 GOLDEN ---"

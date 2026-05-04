@@ -16,8 +16,11 @@ if ! command -v docker &> /dev/null; then
     systemctl enable docker
 fi
 
-# 2. Auth Artifact Registry
-gcloud auth configure-docker us-east1-docker.pkg.dev --quiet
+# 2. Auth Artifact Registry — com retry
+for i in $(seq 1 10); do
+    gcloud auth configure-docker us-east1-docker.pkg.dev --quiet && break
+    sleep 6
+done
 
 # 3. Pull com retry
 for i in $(seq 1 5); do
