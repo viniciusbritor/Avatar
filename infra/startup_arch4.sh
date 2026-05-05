@@ -1,7 +1,7 @@
 #!/bin/bash
 # Lana Industrial Startup Script - Architecture 4 (Stateless + GCS Fuse)
 # v5 — Sistema anti-desperdício: Sentinel roda no HOST, não no container.
-# Se o container morrer, o Sentinel na VM desliga em 10 min.
+# Se o container morrer, o Sentinel na VM desliga em 30 min.
 
 echo "--- INICIANDO BOOT INDUSTRIAL ARCH 4 ---"
 
@@ -89,7 +89,7 @@ STATUS_FILE="/workspace/sentinel_status.json"
 IDLE_CYCLES=0
 DEAD_CYCLES=0
 MAX_IDLE=60           # 30 min (30s * 60)
-MAX_DEAD=20           # 10 min (30s * 20) — container morreu
+MAX_DEAD=60           # 30 min (30s * 60) — container morreu
 BOOT_GRACE=600        # 10 min de graça no boot
 
 echo "[SENTINEL-HOST] Iniciado. Monitorando container lana-engine + GPU..."
