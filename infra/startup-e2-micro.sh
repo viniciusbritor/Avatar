@@ -1,8 +1,9 @@
 #!/bin/bash
-# Lana API Startup — VM e2-micro (v3 — auto-cura)
+# Lana API Startup — VM e2-micro (v4 — systemd)
 # Features:
-#   - Cron auto-update: docker pull a cada 5min
-#   - Health check: se API cair 3x, restart container
+#   - Systemd unit lana-api.service (sobrevive a restart de VM e crash)
+#   - Cron auto-update: docker pull a cada 5min → systemctl restart
+#   - Health check: se API cair 3x → systemctl restart
 #   - Idempotente: roda seguro no boot e manualmente
 set -x
 exec > /var/log/lana-startup.log 2>&1
@@ -29,14 +30,32 @@ for i in $(seq 1 5); do
     sleep 10
 done
 
-# 3. Run
-docker rm -f lana-api 2>/dev/null
-docker run -d --name lana-api \
-    --restart unless-stopped \
+# 4. Instalar systemd unit (idempotente — roda na VM host, NÃO no container)
+cat > /etc/systemd/system/lana-api.service << 'UNITEOF'
+[Unit]
+Description=Brasil AI — Avatar API (v3.2.1)
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/docker rm -f lana-api
+ExecStart=/usr/bin/docker run --name lana-api \
+    --restart=no \
     --network host \
     us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest
+ExecStop=/usr/bin/docker stop lana-api
+Restart=always
+RestartSec=5
 
-# 4. Auto-update via cron (a cada 5min verifica imagem nova)
+[Install]
+WantedBy=multi-user.target
+UNITEOF
+systemctl daemon-reload
+systemctl enable lana-api.service
+systemctl restart lana-api.service
+
+# 5. Auto-update via cron (a cada 5min verifica imagem nova)
 cat > /usr/local/bin/lana-auto-update.sh << 'CRONEOF'
 #!/bin/bash
 IMAGE="us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest"
@@ -45,14 +64,13 @@ docker pull $IMAGE --quiet 2>/dev/null
 AFTER=$(docker inspect --format='{{.Id}}' $IMAGE 2>/dev/null || echo "")
 if [ -n "$BEFORE" ] && [ -n "$AFTER" ] && [ "$BEFORE" != "$AFTER" ]; then
     echo "[AUTO-UPDATE] Nova imagem detectada. Reiniciando..."
-    docker rm -f lana-api
-    docker run -d --name lana-api --restart unless-stopped --network host $IMAGE
+    systemctl restart lana-api.service
 fi
 CRONEOF
 chmod +x /usr/local/bin/lana-auto-update.sh
 (crontab -l 2>/dev/null; echo "*/5 * * * * /usr/local/bin/lana-auto-update.sh") | crontab -
 
-# 5. Health check auto-restart (a cada 1min)
+# 6. Health check auto-restart (a cada 1min)
 cat > /usr/local/bin/lana-health-check.sh << 'HEALEOF'
 #!/bin/bash
 FAILS=0
@@ -63,8 +81,8 @@ for i in $(seq 1 3); do
     FAILS=$((FAILS+1))
     sleep 5
 done
-echo "[HEALTH-CHECK] API falhou $FAILS vezes. Reiniciando container..."
-docker restart lana-api
+echo "[HEALTH-CHECK] API falhou $FAILS vezes. Reiniciando..."
+systemctl restart lana-api.service
 HEALEOF
 chmod +x /usr/local/bin/lana-health-check.sh
 (crontab -l 2>/dev/null; echo "* * * * * /usr/local/bin/lana-health-check.sh") | crontab -
