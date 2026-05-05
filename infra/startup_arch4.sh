@@ -66,7 +66,19 @@ rm -rf /workspace/latentsync/checkpoints
 ln -sfn /mnt/weights /workspace/latentsync/checkpoints
 chmod -R 777 /workspace
 
-# 9. RUN CONTAINER
+# 9. COPIAR CÓDIGO PYTHON DA IMAGEM PARA O HOST
+#    A imagem golden tem os scripts em /workspace/src/,
+#    mas o mount -v /workspace:/workspace esconde eles.
+#    Extraímos para /workspace/src/ no host antes de rodar.
+echo "--- EXTRAINDO CODIGO PYTHON DA IMAGEM ---"
+TEMP_CONTAINER=$(docker create us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden)
+docker cp "$TEMP_CONTAINER:/workspace/src" /workspace/src
+docker cp "$TEMP_CONTAINER:/workspace/latentsync" /workspace/latentsync
+docker rm "$TEMP_CONTAINER"
+chmod -R 777 /workspace/src
+chmod -R 777 /workspace/latentsync
+
+# 10. RUN CONTAINER
 echo "--- INICIANDO CONTAINER L4 ---"
 API_KEY=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/api-key 2>/dev/null || echo "brasilai-avatar-2026")
 docker rm -f lana-engine 2>/dev/null
@@ -80,7 +92,7 @@ docker run -d --name lana-engine \
     us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden \
     python3 /workspace/src/industrial_main.py
 
-# 10. SENTINEL NO HOST (systemd — roda FORA do container)
+# 11. SENTINEL NO HOST (systemd — roda FORA do container)
 #    Se o container morrer → shutdown em MAX_DEAD_CYCLES
 #    Se a GPU ficar idle → shutdown em MAX_IDLE_CYCLES
 cat <<'SENTINEL_EOF' > /usr/local/bin/lana-host-sentinel.sh
