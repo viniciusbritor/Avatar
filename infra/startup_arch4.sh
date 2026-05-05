@@ -73,7 +73,7 @@ chmod -R 777 /workspace
 echo "--- EXTRAINDO CODIGO PYTHON DA IMAGEM ---"
 TEMP_CONTAINER=$(docker create us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden)
 docker cp "$TEMP_CONTAINER:/workspace/src" /workspace/src
-docker cp "$TEMP_CONTAINER:/workspace/latentsync" /workspace/latentsync
+docker cp "$TEMP_CONTAINER:/workspace/latentsync/." /workspace/latentsync
 docker rm "$TEMP_CONTAINER"
 chmod -R 777 /workspace/src
 chmod -R 777 /workspace/latentsync
