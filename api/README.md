@@ -1,23 +1,24 @@
 # Brasil AI — Avatar API
-## Guia de Deploy (Cloud Run)
+## Guia de Deploy (VM e2-micro IP fixo — v3.2.1)
 
-### Estrutura (Paralela — Pipeline Original Intacto)
+### Estrutura
 
 ```
 Avatar/
-├── src/                        # ✅ Pipeline original — NÃO MODIFICADO
+├── src/                        # Pipeline original
 │   ├── agente_lana_orchestrator.py
-│   ├── produce_requested_videos.py   # Ainda funciona localmente
+│   ├── produce_requested_videos.py
 │   ├── industrial_main.py
 │   └── secrets_manager.py
 ├── infra/
-│   └── startup_arch4.sh        # Shared com API e pipeline local
-├── api/                        # 🆕 Nova camada de API (Cloud Run)
-│   ├── Dockerfile              # Container com gcloud SDK
+│   ├── startup_arch4.sh        # Boot script GPU L4
+│   └── startup-e2-micro.sh     # Boot script VM API
+├── api/                        # API layer
+│   ├── Dockerfile              # Container imagem API
 │   ├── requirements.txt
-│   ├── main.py                 # FastAPI server
-│   └── cloud_engine.py        # Subclasse do engine (path cloud)
-└── outputs/                    # Saída local (ainda funciona)
+│   ├── main.py                 # FastAPI server (v3.2.1)
+│   └── cloud_engine.py         # Subclasse engine (Linux)
+└── outputs/                    # Saída local
 ```
 
 ### Rollback Seguro
@@ -25,56 +26,34 @@ Caso algo dê errado, volte para o estado blindado:
 ```bash
 git checkout v1.0-BLINDADA-FUNCIONAL
 ```
-O pipeline local (produce_requested_videos.py) nunca foi modificado.
 
 ---
 
-### 1. Pré-requisito: Service Account GCP
+### 1. Deploy (Cloud Build → Artifact Registry → VM cron auto-update)
 
-Crie uma SA com permissões:
-- `Compute Admin`
-- `Storage Admin`
-- `Artifact Registry Writer`
-- `Secret Manager Secret Accessor`
+O deploy é **totalmente automatizado**:
 
 ```bash
-gcloud iam service-accounts create avatar-api-sa \
-  --project brasili-ia-news \
-  --display-name "Avatar API Service Account"
+# 1. Commit e push no GitHub
+git add -A && git commit -m "..." && git push origin master
 
-# Dar permissões
-for role in roles/compute.admin roles/storage.admin roles/artifactregistry.writer; do
-  gcloud projects add-iam-policy-binding brasili-ia-news \
-    --member="serviceAccount:avatar-api-sa@brasili-ia-news.iam.gserviceaccount.com" \
-    --role="$role"
-done
+# 2. Cloud Build gera a imagem e faz push para Artifact Registry
+gcloud builds submit --project brasili-ia-news --region us-east1 --config cloudbuild-api.yaml .
+
+# 3. A VM lana-api (35.231.46.76) puxa a nova imagem via cron a cada 5 min
+#    Script: /usr/local/bin/lana-auto-update.sh
 ```
 
-### 2. Deploy
+A VM está em **us-east1-b**, roda **e2-micro** com IP fixo. O container usa `--restart unless-stopped` — sobrevive a restart da VM.
 
-```bash
-# Do diretório raiz do projeto Avatar/
-gcloud run deploy avatar-api \
-  --project brasili-ia-news \
-  --region us-east1 \
-  --source . \
-  --dockerfile api/Dockerfile \
-  --service-account avatar-api-sa@brasili-ia-news.iam.gserviceaccount.com \
-  --set-env-vars "API_SECRET_KEY=SEU_TOKEN_AQUI,STARTUP_SCRIPT_PATH=/app/infra/startup_arch4.sh" \
-  --timeout 3600 \
-  --memory 2Gi \
-  --cpu 2 \
-  --no-allow-unauthenticated
-```
-
-### 3. Uso da API
+### 2. Uso da API
 
 **Solicitar Avatar:**
 ```bash
-curl -X POST https://avatar-api-xxx.run.app/produce \
-  -H "Authorization: Bearer SEU_TOKEN_AQUI" \
+curl -X POST http://35.231.46.76:8080/produce \
+  -H "X-API-Key: brasilai-avatar-2026" \
   -H "Content-Type: application/json" \
-  -d '{"text": "Eu sou a Cris do Brasil AI, isso é um teste."}'
+  -d '{"text": "Eu sou a Cris do Brasil AI, isso e um teste."}'
 ```
 
 **Resposta:**
@@ -82,26 +61,18 @@ curl -X POST https://avatar-api-xxx.run.app/produce \
 {
   "job_id": "a2cdc85b",
   "status": "queued",
-  "message": "Job enfileirado! Use GET /status/a2cdc85b para acompanhar.",
-  "created_at": "2026-04-28T22:30:00Z"
+  "message": "Job a2cdc85b enfileirado. GPU sera iniciada.",
+  "created_at": "2026-05-05T19:03:17-03:00"
 }
 ```
 
 **Acompanhar Progresso:**
 ```bash
-curl https://avatar-api-xxx.run.app/status/a2cdc85b \
-  -H "Authorization: Bearer SEU_TOKEN_AQUI"
+curl http://35.231.46.76:8080/status/a2cdc85b \
+  -H "X-API-Key: brasilai-avatar-2026"
 ```
 
-**Interface Visual (Swagger UI):**
-Abra no navegador: `https://avatar-api-xxx.run.app/docs`
-
----
-
-### 4. Configuração de Secrets (Phase 2C)
-O `secrets_manager.py` já detecta automaticamente Cloud Run via `K_SERVICE`.
-Basta subir o `brasil_ai.db` para o Bucket GCS:
-
+**Health Check:**
 ```bash
-gsutil cp src/brasil_ai.db gs://brasil-ai-avatars-vault/brasil_ai.db
+curl http://35.231.46.76:8080/health
 ```

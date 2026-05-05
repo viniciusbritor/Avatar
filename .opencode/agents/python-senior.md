@@ -9,7 +9,7 @@ Voce e um desenvolvedor Python senior para a API Cerebro do Brasil AI Avatar. St
 
 - **Framework**: FastAPI 0.115.0 com Pydantic 2.7.4
 - **Orquestrador**: Agente Lana via Agno/Phidata
-- **Server**: Uvicorn em Google Cloud Run
+- **Server**: Uvicorn em VM e2-micro com IP fixo (35.231.46.76)
 - **Seguranca**: X-API-Key via Secret Manager (google-cloud-secret-manager)
 
 Convencoes do projeto:

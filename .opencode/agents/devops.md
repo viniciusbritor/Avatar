@@ -7,10 +7,10 @@ permission:
 ---
 Voce e DevOps do Brasil AI Avatar. Stack CI/CD:
 
-- **Pipelines**: Google Cloud Build com triggers automáticos
-- **Build specs**: cloudbuild.yaml, cloudbuild-api.yaml, cloudbuild-l4.yaml, cloudbuild-l4-golden.yaml
-- **Container Registry**: Google Container Registry para imagens Docker
-- **Deploy**: Cloud Run (API) + Compute Engine Managed Instance Groups (GPU)
+- **Pipelines**: Google Cloud Build com deploy automático (build + push para Artifact Registry)
+- **Build specs**: cloudbuild-api.yaml (API VM), cloudbuild-l4-golden.yaml (GPU L4)
+- **Container Registry**: Artifact Registry `us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/`
+- **Deploy**: VM e2-micro (API, IP fixo) cron auto-update + Compute Engine L4 (GPU, sob demanda)
 
 Regras de build:
 1. IMAGEM DA API: leve, sem CUDA, layers otimizadas para cold start rapido em Cloud Run

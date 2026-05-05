@@ -3,16 +3,17 @@
 Este documento define a arquitetura final, agnóstico de região e autossuficiente para a produção de avatares IA.
 
 ## 1. Arquitetura de Infraestrutura (GCP)
-- **Instância**: `g2-standard-4` (NVIDIA L4 24GB).
-- **Região Primária**: `us-west1-a` (Oregon).
+- **API**: VM `e2-micro` com IP fixo (`35.231.46.76`) em `us-east1-b`.
+- **GPU**: `g2-standard-12` (48GB RAM, NVIDIA L4 24GB VRAM).
+- **Região Primária**: `us-east1` (fallback: 13 zonas globais).
 - **Modelo de Custo**: **On-Demand Sovereignty** (Disponibilidade garantida sem dependência de leilão).
 - **Gestão de Redução de Custos**:
-  - **Zero-Waste**: O orquestrador local desliga a instância imediatamente após o download do resultado.
-  - **Sentinela de Inatividade**: Script interno na VM que dispara um `sudo shutdown -h now` caso a GPU permaneça ociosa por mais de 20 minutos (Proteção contra falhas de orquestração).
+  - **Zero-Waste**: Sentinel HOST (systemd) desliga GPU em 30 min de inatividade ou 30 min se container morrer. Dead Man Switch absoluto em 90 min.
+  - **Sentinela**: `lana-sentinel.service` roda no HOST da VM (fora do container), sem single point of failure.
 - **Segurança**: Firewall fechado; acesso exclusivo via **IAP (Identity-Aware Proxy)**.
 
 ## 2. Orquestração e Statelessness
-- **Backbone de Ativos**: Bucket `gs://brasil-ia-lana-assets/`.
+- **Backbone de Ativos**: Bucket `gs://lana-weights-universal/` (checkpoints) + `gs://brasil-ai-avatars-vault/` (outputs).
   - `/models/`: 15GB de pesos (UNet, Whisper, SyncNet, Buffalo_L).
   - `/templates/`: Vídeos originais da Lana.
 - **Startup-Script**: Automação total via metadados do Google Cloud. Toda nova VM injeta automaticamente os modelos e inicializa o Docker em regime stateless.

@@ -1,29 +1,31 @@
-# Arquitetura Industrial Avatar (v3.1.6) — "Cérebro & Motor"
+# Arquitetura Industrial Avatar (v3.2.1) — "Cérebro & Motor"
 
 Este documento é a especificação soberana do ecossistema Brasil AI Avatar. Toda e qualquer modificação no código deve respeitar os pilares de **Zero-Waste**, **Cloud-Native** e **Blindagem de Segurança** aqui descritos.
 
 ---
 
 ## 1. Visão Geral (The Grand Design)
-O sistema é dividido em duas camadas de responsabilidade distinta, conectadas via **Cloud Tasks** e **Pub/Sub**:
+O sistema é dividido em duas camadas de responsabilidade distinta, conectadas via **Firestore** e **Webhook**:
 
-1.  **O Cérebro (API v3.1.6):** Servidor FastAPI rodando em Google Cloud Run. Responsável pela inteligência, orquestração e gestão de fila.
+1.  **O Cérebro (API v3.2.1):** Servidor FastAPI rodando em **VM e2-micro com IP fixo** (`35.231.46.76`). Responsável pela inteligência, orquestração e gestão de fila.
 2.  **O Motor (L4 Engine):** Instâncias NVIDIA L4 (Compute Engine) dinâmicas, que nascem e morrem conforme a demanda, focadas exclusivamente em renderização pesada.
 
 ---
 
 ## 2. Componentes da Infraestrutura
 
-### 2.1 API Cérebro (Cloud Run)
+### 2.1 API Cérebro (VM e2-micro — IP fixo)
 - **Tecnologia:** Python 3.11, FastAPI.
+- **Host:** VM e2-micro (`lana-api`) em `us-east1-b`. IP fixo: `35.231.46.76`.
 - **Orquestrador:** Agente Lana (Maestro via Agno/Phidata).
 - **Segurança:** Autenticação via `X-API-Key` (validada contra Secret Manager).
-- **Missão:** Receber requisições, gerar áudio (ElevenLabs), e despachar o job para a fila.
+- **Missão:** Receber requisições, gerar áudio (ElevenLabs), enfileirar job no Firestore, e disparar GPU L4 sob demanda.
+- **Deploy:** Cloud Build gera imagem → Artifact Registry → VM puxa via cron a cada 5 min (`infra/startup-e2-micro.sh`).
 
-### 2.2 Gerenciamento de Fila (Cloud Tasks)
-- **Fila:** `avatar-render-queue`.
-- **Papel:** Blindar a API contra picos de tráfego. O Cloud Tasks gerencia retentativas automáticas caso a GPU falhe no boot.
-- **Deadline:** 30 minutos por tentativa.
+### 2.2 Gerenciamento de Jobs (Firestore)
+- **Collection:** `avatar_jobs`.
+- **Fluxo:** API escreve job como `queued` → GPU faz polling e processa → GPU notifica API via webhook → API atualiza para `completed`.
+- **Vantagem:** Sem dependência de Cloud Tasks ou Pub/Sub. Firestore serve como fila e banco de estado simultaneamente.
 
 ### 2.3 Motor de IA (Compute Engine L4)
 - **Hardware:** `g2-standard-12` (NVIDIA L4 24GB VRAM).
