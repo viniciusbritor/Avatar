@@ -5,6 +5,7 @@ import time
 import json
 import threading
 import requests
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Optional
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from pydantic import BaseModel
@@ -200,8 +201,10 @@ def run_inference(job_id, audio_url, template, webhook_url=None):
         if mux_proc.returncode == 0:
             print(f"✅ [WORKER] Muxing concluído para {job_id}")
             
-            # 6. Upload para GCS (Padrão Industrial V19)
-            remote_filename = f"final_{job_id}.mp4"
+            # 6. Upload para GCS
+            BRT = timezone(timedelta(hours=-3))
+            ts = datetime.now(BRT).strftime("%d%m%Y_%H%M%S")
+            remote_filename = f"avatar_{ts}.mp4"
             remote_path = f"outputs/{remote_filename}"
             print(f"📦 [GCS] Iniciando upload: {remote_path}")
             
