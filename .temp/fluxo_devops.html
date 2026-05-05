@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>Ciclo de Desenvolvimento + Deploy — Brasil AI Avatar</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true, theme:'dark', flowchart:{useMaxWidth:true,htmlLabels:true}, securityLevel:'loose'});</script>
+<style>
+  body { background: #0c0e12; margin: 0; padding: 16px; }
+  h2 { color: #a1faff; font-family: sans-serif; font-size: 14px; margin-bottom: 8px; }
+  .sub { color: #a9abb0; font-family: sans-serif; font-size: 11px; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<h2>Ciclo de Desenvolvimento + Deploy — Brasil AI Avatar</h2>
+<div class="sub">Como ajustes de código chegam até a produção (Git → Cloud Build → Artifact Registry → Cloud Run/VM)</div>
+<pre class="mermaid">
+%% ─── Brasil AI Avatar — Ciclo de Desenvolvimento + Deploy ───
+%% Como ajustes de código chegam até a produção
+
+flowchart TD
+    subgraph DEV["💻 DESENVOLVIMENTO LOCAL (Windows/Mac)"]
+        EDIT["✏️ Edita código no VS Code / terminal
+        api/main.py | infra/startup_arch4.sh
+        src/*.py | Dockerfile | cloudbuild.yaml"]
+        
+        TEST["🧪 Testes manuais locais
+        python src/produce_requested_videos.py
+        curl localhost:8080/health"]
+    end
+
+    subgraph GIT["🔀 GIT (GitHub)"]
+        COMMIT["📦 git add + git commit
+        Mensagem descritiva:
+        'fix: Sentinel no HOST evita GPU zumbi'
+        'feat: nova voz ElevenLabs'"]
+        
+        PUSH["⬆️ git push origin master
+        Trigger: push na branch master"]
+    end
+
+    subgraph CB["🏗️ GOOGLE CLOUD BUILD"]
+        WHICH{"Qual arquivo
+        foi alterado?"}
+
+        API_BUILD["🐳 Build API image
+        cloudbuild-api.yaml
+        docker build -f api/Dockerfile .
+        ─────────────────
+        Base: python:3.11-slim
+        Inclui: api/ + src/ + infra/
+        Sem CUDA (imagem leve ~400MB)"]
+
+        L4_BUILD["🐳 Build GPU L4 image
+        cloudbuild-l4-golden.yaml
+        docker build -f infra/Dockerfile.avatar-l4-v2.10-golden .
+        ─────────────────
+        Base: nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
+        Inclui: LatentSync, GFPGAN, PyTorch, Whisper
+        ~15GB build time: ~5 min"]
+
+        PUSH_IMG["📤 Push para Artifact Registry
+        us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/
+        ─────────────────
+        avatar-api:latest (API)
+        avatar-l4:v2.10-golden (GPU)"]
+    end
+
+    subgraph DEPLOY["🚀 DEPLOY"]
+        CR_DEPLOY["☁️ Cloud Run Deploy
+        gcloud run deploy avatar-api
+        --image avatar-api:latest
+        --region us-east1
+        ─────────────────
+        Novo revision em segundos
+        100% tráfego migrado
+        Rollback automático se health check falhar"]
+
+        VM_AUTO["🔄 VM lana-api (e2-micro) Auto-Update
+        Cron a cada 5 min:
+        docker pull avatar-api:latest
+        docker stop + docker run
+        ─────────────────
+        Sem downtime (health check
+        garante rollout seguro)"]
+
+        NEW_VMS["🆕 Novas VMs GPU L4
+        Já nascem com startup_arch4.sh
+        ATUALIZADO da nova imagem API
+        ─────────────────
+        Sentinel HOST corrigido
+        3 camadas de shutdown
+        independentes do container"]
+    end
+
+    subgraph IMPACT["🎯 IMPACTO EM PRODUÇÃO"]
+        EXISTING_GPU["🟡 GPUs existentes
+        Continuam com startup script ANTIGO
+        (já injetado no metadata da VM)
+        ─────────────────
+        Só recebem o fix na PRÓXIMA
+        criação de VM"]
+        
+        NEW_GPU["🟢 NOVAS GPUs
+        Criadas após o deploy
+        Já usam startup_arch4.sh v5
+        ─────────────────
+        Sentinel HOST ativo
+        Container watchdog 10 min
+        Dead Man Switch 90 min"]
+        
+        CLIENTS["👥 Clientes
+        POST /produce → mesma URL
+        https://avatar-api-ckzdqzo75q-ue.a.run.app
+        ─────────────────
+        Sem mudança no contrato da API
+        Mesmo X-API-Key
+        Mesmo formato request/response"]
+    end
+
+    subgraph ROLLBACK["⏪ ROLLBACK DE EMERGÊNCIA"]
+        RB_GIT["git checkout v1.0-BLINDADA-FUNCIONAL
+        ─────────────────
+        Tag blindada com pipeline
+        local intacto"]
+        
+        RB_CR["Cloud Run: seleciona revision anterior
+        gcloud run services update-traffic --to-revisions=..."]
+
+        RB_VM["VM: docker pull imagem antiga + restart"]
+    end
+
+    EDIT --> TEST
+    TEST --> COMMIT
+    COMMIT --> PUSH
+    PUSH --> WHICH
+
+    WHICH -- "api/* ou infra/* ou src/*" --> API_BUILD
+    WHICH -- "latentsync/* ou Dockerfile L4" --> L4_BUILD
+    API_BUILD --> PUSH_IMG
+    L4_BUILD --> PUSH_IMG
+
+    PUSH_IMG --> CR_DEPLOY
+    PUSH_IMG -.-> VM_AUTO
+    PUSH_IMG -.-> NEW_VMS
+
+    CR_DEPLOY --> CLIENTS
+    VM_AUTO --> CLIENTS
+    NEW_VMS --> NEW_GPU
+    EXISTING_GPU
+
+    RB_GIT -.-> COMMIT
+    RB_CR -.-> CR_DEPLOY
+    RB_VM -.-> VM_AUTO
+</pre>
+</body>
+</html>
