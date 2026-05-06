@@ -31,6 +31,7 @@ Todas as credenciais são obtidas em runtime via `secrets_manager.py` consultand
 | `API_SECRET_KEY` | Auth HTTP entre Cérebro e Motor |
 | `GCP_SA_KEY` | JSON da Service Account master |
 | `ELEVEN_LABS_API_KEY` | ElevenLabs TTS |
+| `ELEVEN_VOICE_ID` | Voz pt-BR nativa (Mariana) |
 | `GEMINI_API_KEY` | Google Gemini (Maestro) |
 
 **Backup offline:** `gs://brasil-ai-avatars-vault/brasil_ai.db` (SQLite com todas as chaves do ecossistema YouTube). Não usado em runtime.

@@ -25,10 +25,11 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 
 ### 2.2 Cofre de Segredos (GCP Secret Manager — Free Tier)
 - **Source of Truth único** para todas as credenciais do ecossistema.
-- **Secrets ativas (4/6 do Free Tier):**
+- **Secrets ativas (5/6 do Free Tier):**
     - `API_SECRET_KEY` — Chave de autenticação HTTP interna entre Cérebro e Motor (header `X-API-Key`).
     - `GCP_SA_KEY` — JSON da Service Account master com acesso total ao projeto `brasili-ia-news`.
     - `ELEVEN_LABS_API_KEY` — Token da API ElevenLabs para síntese de voz (TTS).
+    - `ELEVEN_VOICE_ID` — ID da voz ElevenLabs. **Obrigatório ser voz nativa pt-BR** (ex: Mariana `H57lpZd9a8RhAccsai8Z`). NUNCA usar vozes em inglês com "ajuste" de sotaque (ex: Matilda/Sarah).
     - `GEMINI_API_KEY` — Chave do Google Gemini para raciocínio do Maestro.
 - **Backup:** O banco SQLite `brasil_ai.db` com todas as chaves do ecossistema YouTube está espelhado em `gs://brasil-ai-avatars-vault/brasil_ai.db` como cópia de segurança offline. NÃO é usado como fonte primária em runtime.
 
@@ -44,6 +45,7 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
     - **Startup Script:** Configura Docker, Nvidia Toolkit (`nvidia-ctk` incondicional), e GCS Fuse em segundos.
     - **Código Python:** Obtido fresco do GitHub (`git clone https://github.com/viniciusbritor/Avatar.git`) no boot — NUNCA extraído da imagem golden (evita rodar código congelado/defasado).
     - **Docker Image:** `avatar-l4:v2.10` (Layers otimizadas, todas deps baked).
+- **Template de Vídeo:** `lana_comentario.mp4` (do bucket `gs://lana-weights-universal/assets/`). Sincronizado via `gsutil -m cp` no startup. Este é o avatar visual padrão para lip-sync.
 
 ### 2.5 Devolução e Gatilho (Firestore + GCS)
 - **Storage:** Vídeos salvos em `gs://brasil-ai-avatars-vault/outputs/`.
