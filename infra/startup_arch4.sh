@@ -75,7 +75,7 @@ chmod -R 777 /workspace
 #    sem importar código velho congelado na imagem golden.
 echo "--- CLONANDO CODIGO FRESCO DO REPOSITORIO ---"
 rm -rf /tmp/avatar_repo
-git clone https://github.com/viniciusbritor/Avatar.git /tmp/avatar_repo
+git clone --recurse-submodules https://github.com/viniciusbritor/Avatar.git /tmp/avatar_repo
 rm -rf /workspace/src
 cp -r /tmp/avatar_repo/src /workspace/src
 cp -rn /tmp/avatar_repo/latentsync/. /workspace/latentsync/ 2>/dev/null || true
