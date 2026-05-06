@@ -1,5 +1,5 @@
 # Brasil AI — Avatar API
-## Guia de Deploy (VM e2-micro IP fixo — v3.2.1)
+## Guia de Deploy (VM e2-micro IP fixo — v3.2.2)
 
 ### Estrutura
 
@@ -11,21 +11,29 @@ Avatar/
 │   ├── industrial_main.py
 │   └── secrets_manager.py
 ├── infra/
-│   ├── startup_arch4.sh        # Boot script GPU L4
+│   ├── startup_arch4.sh        # Boot script GPU L4 (git clone + nvidia-ctk)
 │   └── startup-e2-micro.sh     # Boot script VM API
 ├── api/                        # API layer
 │   ├── Dockerfile              # Container imagem API
 │   ├── requirements.txt
-│   ├── main.py                 # FastAPI server (v3.2.1)
+│   ├── main.py                 # FastAPI server (v3.2.2)
+│   ├── secrets_manager.py      # Consulta EXCLUSIVA ao GCP Secret Manager
 │   └── cloud_engine.py         # Subclasse engine (Linux)
 └── outputs/                    # Saída local
 ```
 
-### Rollback Seguro
-Caso algo dê errado, volte para o estado blindado:
-```bash
-git checkout v1.0-BLINDADA-FUNCIONAL
-```
+### Cofre de Segredos (GCP Secret Manager)
+
+Todas as credenciais são obtidas em runtime via `secrets_manager.py` consultando o GCP Secret Manager (projeto `brasili-ia-news`). **Nunca há fallback para valores hardcoded.**
+
+| Secret | Finalidade |
+|--------|-----------|
+| `API_SECRET_KEY` | Auth HTTP entre Cérebro e Motor |
+| `GCP_SA_KEY` | JSON da Service Account master |
+| `ELEVEN_LABS_API_KEY` | ElevenLabs TTS |
+| `GEMINI_API_KEY` | Google Gemini (Maestro) |
+
+**Backup offline:** `gs://brasil-ai-avatars-vault/brasil_ai.db` (SQLite com todas as chaves do ecossistema YouTube). Não usado em runtime.
 
 ---
 
@@ -42,10 +50,9 @@ gcloud builds submit --project brasili-ia-news --config cloudbuild-api.yaml .
 
 # 3. A VM lana-api (35.231.46.76) puxa a nova imagem via cron a cada 5 min
 #    Script: /usr/local/bin/lana-auto-update.sh
-#    Verificar se já atualizou: gcloud compute ssh lana-api ... "sudo docker exec lana-api grep webhook_url /app/api/main.py"
 ```
 
-A VM está em **us-east1-b**, roda **e2-micro** com IP fixo. O container usa `--restart unless-stopped` — sobrevive a restart da VM.
+A VM está em **us-east1-c** (pode migrar para `us-east1-b` ou `us-east1-d` se houver `ZONE_RESOURCE_POOL_EXHAUSTED`), roda **e2-micro** com IP fixo regional `35.231.46.76`. O container usa `--restart unless-stopped` — sobrevive a restart da VM.
 
 ### 2. Uso da API
 
