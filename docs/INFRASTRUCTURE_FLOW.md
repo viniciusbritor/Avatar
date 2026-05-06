@@ -1,58 +1,42 @@
-# 🏗️ Fluxo de Criação de Infraestrutura (V17.1)
+# Infraestrutura — Brasil AI Avatar v3.2.1
 
-A infraestrutura do projeto Lana é **dinâmica e orientada a eventos**, seguindo o princípio **Zero-Waste** (pague apenas pelos minutos de renderização).
+A infraestrutura segue o princípio **Zero-Waste**: GPUs nascem e morrem sob demanda.
 
-O arquivo mestre responsável por toda a criação, gestão e destruição da infraestrutura é o:
-📄 [agente_lana_orchestrator.py](file:///c:/Users/vinic/workspace_antigravity/Avatar/src/agente_lana_orchestrator.py)
+## API (VM e2-micro)
 
-## 🔄 Ciclo de Vida da Infraestrutura
+- **Host:** `lana-api` (us-east1-b, IP fixo `35.231.46.76`)
+- **Deploy:** Cloud Build → Artifact Registry → VM cron auto-update (5 min)
+- **Boot:** `infra/startup-e2-micro.sh` (Docker + systemd unit)
+- **Endpoints:** POST /produce, GET /status/{job_id}, GET /health, POST /webhook/render-complete
+
+## GPU L4 (Compute Engine)
+
+- **Hardware:** `g2-standard-12` (48GB RAM, NVIDIA L4 24GB VRAM)
+- **Imagem:** `avatar-l4:v2.10-golden` (CUDA 12.1, PyTorch 2.5.1, LatentSync, GFPGAN)
+- **Boot:** `infra/startup_arch4.sh` → Docker + NVIDIA Toolkit → GCS Fuse → pull golden image → docker cp código → container
+- **Shutdown:** Sentinel HOST (systemd) + Dead Man Switch (90 min)
+
+## Ciclo de Vida
 
 ```mermaid
 sequenceDiagram
-    participant O as Orchestrator (Local)
-    participant G as GCP API
-    participant I as G2 Instance (Spawned)
-    participant C as GCS Bucket
+    participant U as Usuário
+    participant A as API (e2-micro)
+    participant F as Firestore
+    participant G as GPU L4
+    participant C as GCS
 
-    O->>O: produce_video_from_text(text)
-    O->>G: gcloud compute instances create (usando Gold Image V6)
-    Note over G: Criando GPU L4 Standard...
-    alt Sucesso na Região
-        G-->>O: Instância Pronta
-    else Falha ou Timeout
-        O->>G: gcloud compute instances/disks delete (Clean-up Imediato)
-        Note over O: Maestro pula para próxima região da lista soberana
-    end
-    
-    O->>I: gcloud compute scp (Sincroniza scripts V17.1)
-    O->>I: bootstrap_v18() (Inicia MCP Bridge + Motor)
-    
-    O->>C: Upload Áudio (ElevenLabs Sarah)
-    O->>I: Call MCP "create_render_job"
-    
-    loop Monitoramento
-        O->>I: Call MCP "get_render_status"
-        I-->>O: % Progresso (GPU Inference)
-    end
-    
-    I->>C: Upload Vídeo Final
-    C-->>O: gsutil cp (Download para Notebook)
-    O->>O: Print Caminho Completo (Sucesso!)
+    U->>A: POST /produce
+    A->>A: TTS ElevenLabs
+    A->>C: Upload audio
+    A->>F: job (queued)
+    A->>G: gcloud create (13 zonas)
+    G->>G: startup_arch4.sh (boot)
+    G->>F: polling (status=queued)
+    G->>C: download audio
+    G->>G: LatentSync + GFPGAN
+    G->>C: upload video
+    G->>A: webhook
+    A->>F: job (completed)
+    G->>G: auto-shutdown
 ```
-
-## 🛠️ Detalhes do arquivo `agente_lana_orchestrator.py`
-
-| Método | Função | Comando Principal |
-| :--- | :--- | :--- |
-| `ensure_instance_ready` | Maestro de Failover | Tenta spawnar em múltiplas zonas até obter GPU. |
-| `_create_from_gold` | **O Criador** | `gcloud compute instances create ... --image GOLD_IMAGE` |
-| `bootstrap_v18` | Provisionamento | Sincroniza `lipsync_pipeline.py` e inicia o `lana_mcp_server.py`. |
-| `call_mcp_tool` | Ponte de Comando | Usa IAP Tunneling para enviar comandos sem abrir portas (Security First). |
-
----
-> [!IMPORTANT]
-> **Protocolo de Limpeza Transregional:**
-> Sempre que o orquestrador pular de uma região para outra devido a erro de provisão ou timeout, ele DEVE disparar uma rotina de limpeza para remover qualquer disco ou instância remanescente na região anterior, garantindo o estado **Zero-Waste** global.
-
-> [!NOTE]
-> Toda a inteligência de "Auto-Cura" e "Failover de Zona" reside na classe `LanaIndustrialEngine` dentro deste arquivo. Se uma zona (ex: `us-central1-a`) estiver sem estoque de GPUs, o orquestrador pula automaticamente para a próxima zona da lista soberana.
