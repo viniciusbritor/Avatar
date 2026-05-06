@@ -31,17 +31,18 @@ git checkout v1.0-BLINDADA-FUNCIONAL
 
 ### 1. Deploy (Cloud Build → Artifact Registry → VM cron auto-update)
 
-O deploy é **totalmente automatizado**:
+O deploy exige **dois passos manuais** (GitHub Actions NÃO trigga Cloud Build automaticamente):
 
 ```bash
 # 1. Commit e push no GitHub
 git add -A && git commit -m "..." && git push origin master
 
-# 2. Cloud Build gera a imagem e faz push para Artifact Registry
-gcloud builds submit --project brasili-ia-news --region us-east1 --config cloudbuild-api.yaml .
+# 2. Disparar Cloud Build MANUALMENTE para gerar a imagem e fazer push para Artifact Registry
+gcloud builds submit --project brasili-ia-news --config cloudbuild-api.yaml .
 
 # 3. A VM lana-api (35.231.46.76) puxa a nova imagem via cron a cada 5 min
 #    Script: /usr/local/bin/lana-auto-update.sh
+#    Verificar se já atualizou: gcloud compute ssh lana-api ... "sudo docker exec lana-api grep webhook_url /app/api/main.py"
 ```
 
 A VM está em **us-east1-b**, roda **e2-micro** com IP fixo. O container usa `--restart unless-stopped` — sobrevive a restart da VM.

@@ -44,11 +44,11 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 ## 3. Fluxo Industrial (Step-by-Step)
 
 1.  **Injeção:** Usuário chama `POST /produce` na API.
-2.  **Enfileiramento:** API salva o job no **Firestore** como `queued` e cria uma Task no Cloud Tasks.
-3.  **Despacho:** O Cloud Tasks aciona o Worker interno da API, que invoca o **Maestro**.
-4.  **Caça por GPU:** O Maestro busca globalmente (13+ zonas) por uma GPU L4. Se necessário, cria uma nova.
-5.  **Processamento:** A GPU executa o Lip Sync e sobe o vídeo para o GCS.
-6.  **Callback:** O Worker avisa a API via Webhook que o vídeo está pronto.
+2.  **Enfileiramento:** API gera áudio (TTS), salva o job no **Firestore** como `queued` com `webhook_url` apontando para `http://35.231.46.76:8080/webhook/render-complete` (HTTP puro, sem TLS — a API escuta na porta 8080 sem proxy reverso).
+3.  **Spin-up GPU:** A API dispara `_spawn_gpu()` em background (caça 13+ zonas globais por L4 disponível, cria instância se necessário).
+4.  **Processamento:** A GPU L4 faz polling no Firestore por jobs `queued`, executa o Lip Sync, sobe o vídeo para o GCS.
+5.  **Callback (Webhook):** A GPU notifica a API via `POST` no endpoint `/webhook/render-complete` no IP fixo da e2-micro. **Crítico:** O protocolo deve ser sempre HTTP (não HTTPS), pois a API não tem TLS. O `webhook_url` é hardcoded no código (`api/main.py:155`) para evitar injeção de `https://` por proxies ou cabeçalhos de cliente.
+6.  **Atualização Firestore:** A API recebe o webhook e atualiza o job para `completed` com o `video_path`.
 7.  **Entrega:** O sync_bridge local (polling Firestore) detecta o status `completed`, baixa o vídeo do GCS, e salva em `sucesso/`.
 8.  **Purga:** A GPU se auto-desliga após o processamento (Sentinel Mode) para garantir custo zero.
 
@@ -59,7 +59,8 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 - **SEMPRE** use `X-API-Key` vinda do Secret Manager.
 - **A IMAGEM DA API** deve ser leve (sem CUDA).
 - **A IMAGEM DO WORKER** deve conter tudo (Imutável), com código como última layer para cache eficiente.
+- **WEBHOOK URL** deve ser sempre `http://35.231.46.76:8080/webhook/render-complete`. Nunca use `request.base_url` diretamente para gerar webhooks — proxies e clientes podem injetar `https://`, quebrando a comunicação L4 → API na porta 8080 crua (sem TLS).
 
 ---
 
-*Documento atualizado em 2026-05-02 por Antigravity (v3.1.6-r2).*
+*Documento atualizado em 2026-05-06 por Antigravity (v3.2.1-r3).*
