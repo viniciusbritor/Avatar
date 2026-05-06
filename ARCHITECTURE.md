@@ -17,6 +17,7 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 ### 2.1 API Cérebro (VM e2-micro — IP fixo)
 - **Tecnologia:** Python 3.11, FastAPI.
 - **Host:** VM e2-micro (`lana-api`) em `us-east1-c`. IP fixo: `35.231.46.76` (regional `us-east1`, movível entre zonas `b`/`c`/`d`).
+- **Base Image:** `ubuntu-2204-lts` (Ubuntu 22.04 LTS, `ubuntu-os-cloud`). Obrigatório — o startup script depende de `apt-get`. NUNCA use `cos-stable` (Container-Optimized OS).
 - **Orquestrador:** Agente Lana (Maestro via Agno/Phidata).
 - **Segurança:** Autenticação via `X-API-Key` (validada **exclusivamente** contra GCP Secret Manager — Fail-Fast se ausente).
 - **Missão:** Receber requisições, gerar áudio (ElevenLabs), enfileirar job no Firestore, e disparar GPU L4 sob demanda.
@@ -59,7 +60,10 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 4.  **Processamento:** A GPU L4 faz polling no Firestore por jobs `queued`, executa o Lip Sync, sobe o vídeo para o GCS.
 5.  **Callback (Webhook):** A GPU notifica a API via `POST` no endpoint `/webhook/render-complete` no IP fixo da e2-micro. **Crítico:** O protocolo deve ser sempre HTTP (não HTTPS), pois a API não tem TLS. O `webhook_url` é hardcoded no código (`api/main.py:155`) para evitar injeção de `https://` por proxies ou cabeçalhos de cliente.
 6.  **Atualização Firestore:** A API recebe o webhook e atualiza o job para `completed` com o `video_path`.
-7.  **Entrega:** O sync_bridge local (polling Firestore) detecta o status `completed`, baixa o vídeo do GCS, e salva em `sucesso/`.
+7.  **Entrega Local:** O vídeo é baixado do bucket GCS para a máquina do operador. Dois métodos suportados:
+    - **Automático:** `python src/sync_bridge.py --once` (polling Firestore, baixa jobs `completed` não baixados)
+    - **Manual:** `gsutil cp gs://brasil-ai-avatars-vault/outputs/final_<JOB_ID>.mp4 sucesso/`
+    - **Caminho local:** `sucesso/` na raiz do projeto Avatar. Ex: `C:\Users\vinic\workspace_antigravity\Avatar\sucesso\video.mp4`
 8.  **Purga:** A GPU se auto-desliga após o processamento (Sentinel Mode) para garantir custo zero.
 
 ---

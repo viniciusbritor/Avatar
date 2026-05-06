@@ -52,7 +52,7 @@ gcloud builds submit --project brasili-ia-news --config cloudbuild-api.yaml .
 #    Script: /usr/local/bin/lana-auto-update.sh
 ```
 
-A VM está em **us-east1-c** (pode migrar para `us-east1-b` ou `us-east1-d` se houver `ZONE_RESOURCE_POOL_EXHAUSTED`), roda **e2-micro** com IP fixo regional `35.231.46.76`. O container usa `--restart unless-stopped` — sobrevive a restart da VM.
+A VM está em **us-east1-c** (pode migrar para `us-east1-b` ou `us-east1-d` se houver `ZONE_RESOURCE_POOL_EXHAUSTED`), roda **e2-micro** com IP fixo regional `35.231.46.76`. Base image: **`ubuntu-2204-lts`** (`ubuntu-os-cloud`) — obrigatório para `apt-get`. O container usa `--restart unless-stopped` — sobrevive a restart da VM.
 
 ### 2. Uso da API
 
@@ -84,3 +84,20 @@ curl http://35.231.46.76:8080/status/a2cdc85b \
 ```bash
 curl http://35.231.46.76:8080/health
 ```
+
+### 3. Download do Vídeo (Entrega Local)
+
+Após o job atingir `status: completed`, o vídeo está no bucket GCS e deve ser baixado para a máquina local.
+
+**Método Automático (recomendado):**
+```bash
+python src/sync_bridge.py --once
+```
+Baixa todos os jobs `completed` ainda não baixados para a pasta `sucesso/`.
+
+**Método Manual:**
+```bash
+gsutil cp gs://brasil-ai-avatars-vault/outputs/final_<JOB_ID>.mp4 sucesso/
+```
+
+**Caminho local de saída:** `C:\Users\vinic\workspace_antigravity\Avatar\sucesso\`
