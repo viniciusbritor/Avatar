@@ -152,8 +152,7 @@ async def produce(request: Request, payload: ProduceRequest, x_api_key: str = He
         raise HTTPException(status_code=400, detail="Texto muito curto (minimo 5 caracteres).")
 
     job_id = str(uuid.uuid4())[:8]
-    base = str(request.base_url).replace("http://", "https://").rstrip('/')
-    webhook_url = f"{base}/webhook/render-complete"
+    webhook_url = f"{str(request.base_url).rstrip('/')}/webhook/render-complete"
 
     orchestrator = AgenteLanaOrchestrator()
 

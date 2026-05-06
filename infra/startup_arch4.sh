@@ -22,9 +22,10 @@ if ! command -v nvidia-ctk &> /dev/null; then
       sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
       tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
     apt-get update -qq && apt-get install -y -qq nvidia-container-toolkit
-    nvidia-ctk runtime configure --runtime=docker
-    systemctl restart docker
 fi
+# Garante runtime configurado mesmo se já instalado (sobrevive a restart)
+nvidia-ctk runtime configure --runtime=docker
+systemctl restart docker
 
 # 3. INSTALAR GCS FUSE
 if ! command -v gcsfuse &> /dev/null; then
