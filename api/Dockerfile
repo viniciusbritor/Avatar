@@ -1,4 +1,4 @@
-# ─── Brasil AI Avatar API — Dockerfile (Cloud Run Edition v5 — Official) ──────
+# ─── Brasil AI Avatar API — Dockerfile (VM e2-micro IP fixo v3.2.1) ──────
 # Focado em estabilidade industrial: Python 3.11 + Gcloud SDK via APT
 
 FROM python:3.11-slim

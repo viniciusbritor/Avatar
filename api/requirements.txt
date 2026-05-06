@@ -1,4 +1,4 @@
-# Brasil AI Avatar API — Dependências (Cloud Run)
+# Brasil AI Avatar API — Dependências (VM e2-micro IP fixo)
 
 # ── Servidor Web ──────────────────────────────────────────────────────────────
 fastapi==0.115.0
