@@ -26,6 +26,9 @@ fi
 # Garante runtime configurado mesmo se já instalado (sobrevive a restart)
 nvidia-ctk runtime configure --runtime=docker
 systemctl restart docker
+# Garante runtime configurado mesmo se já instalado (sobrevive a restart)
+nvidia-ctk runtime configure --runtime=docker
+systemctl restart docker
 
 # 3. INSTALAR GCS FUSE
 if ! command -v gcsfuse &> /dev/null; then
@@ -67,15 +70,15 @@ rm -rf /workspace/latentsync/checkpoints
 ln -sfn /mnt/weights /workspace/latentsync/checkpoints
 chmod -R 777 /workspace
 
-# 9. COPIAR CÓDIGO PYTHON DA IMAGEM PARA O HOST
-#    A imagem golden tem os scripts em /workspace/src/,
-#    mas o mount -v /workspace:/workspace esconde eles.
-#    Extraímos para /workspace/src/ no host antes de rodar.
-echo "--- EXTRAINDO CODIGO PYTHON DA IMAGEM ---"
-TEMP_CONTAINER=$(docker create us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden)
-docker cp "$TEMP_CONTAINER:/workspace/src" /workspace/src
-docker cp "$TEMP_CONTAINER:/workspace/latentsync/." /workspace/latentsync
-docker rm "$TEMP_CONTAINER"
+# 9. OBTER CÓDIGO PYTHON MAIS RECENTE DO GITHUB (MASTER)
+#    Garante que a GPU sempre usará os scripts (e as chaves de segurança) atualizados, 
+#    sem importar código velho congelado na imagem golden.
+echo "--- CLONANDO CODIGO FRESCO DO REPOSITORIO ---"
+rm -rf /tmp/avatar_repo
+git clone https://github.com/viniciusbritor/Avatar.git /tmp/avatar_repo
+rm -rf /workspace/src
+cp -r /tmp/avatar_repo/src /workspace/src
+cp -rn /tmp/avatar_repo/latentsync/. /workspace/latentsync/ 2>/dev/null || true
 chmod -R 777 /workspace/src
 chmod -R 777 /workspace/latentsync
 
