@@ -117,7 +117,14 @@ def get_clip(id: str):
 def notify_webhook(webhook_url: str, payload: dict):
     if not webhook_url: return
     print(f"🔗 [WEBHOOK] Enviando callback para {webhook_url}")
-    api_key = os.environ.get("API_SECRET_KEY", "brasilai-avatar-2026")
+    
+    # Busca chave estritamente do GCP Secret Manager, SEM fallback em código
+    from secrets_manager import get_secret
+    api_key = get_secret("API_SECRET_KEY")
+    if not api_key:
+        print("❌ [WEBHOOK] CRITICAL: API_SECRET_KEY não encontrada no Secret Manager. Abortando callback.")
+        return
+        
     headers = {"X-API-Key": api_key, "Content-Type": "application/json"}
     
     import time

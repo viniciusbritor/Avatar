@@ -32,7 +32,9 @@ except Exception as e:
     print(f"Firestore indisponivel: {e}")
     db = None
 
-API_SECRET_KEY = get_secret("API_SECRET_KEY", fallback="brasilai-avatar-2026")
+API_SECRET_KEY = get_secret("API_SECRET_KEY")
+if not API_SECRET_KEY:
+    raise RuntimeError("CRITICAL SEC: API_SECRET_KEY não encontrada no GCP Secret Manager!")
 
 app = FastAPI(
     title="Brasil AI — Avatar API",

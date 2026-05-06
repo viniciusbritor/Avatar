@@ -81,13 +81,11 @@ chmod -R 777 /workspace/latentsync
 
 # 10. RUN CONTAINER
 echo "--- INICIANDO CONTAINER L4 ---"
-API_KEY=$(curl -s -f -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/api-key 2>/dev/null || echo "brasilai-avatar-2026")
 docker rm -f lana-engine 2>/dev/null
 docker run -d --name lana-engine \
     --gpus all \
     --network host \
     --restart=no \
-    -e API_SECRET_KEY="$API_KEY" \
     -v /workspace:/workspace \
     -v /mnt/weights:/mnt/weights \
     us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden \

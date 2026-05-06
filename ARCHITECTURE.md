@@ -56,7 +56,7 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 
 ## 4. Regras de Ouro para Agentes IA
 - **NUNCA** mude versões de pacotes em `requirements.txt` sem validar o grafo de dependências (especialmente Protobuf).
-- **SEMPRE** use `X-API-Key` vinda do Secret Manager.
+- **SEMPRE** use `X-API-Key` vinda EXCLUSIVAMENTE do Secret Manager. É proibido usar variáveis de ambiente injetadas em bash ou fallbacks em texto claro (`brasilai-avatar-2026`) nos scripts. Se o Secret Manager falhar, o código deve falhar (Fail-Fast).
 - **A IMAGEM DA API** deve ser leve (sem CUDA).
 - **A IMAGEM DO WORKER** deve conter tudo (Imutável), com código como última layer para cache eficiente.
 - **WEBHOOK URL** deve ser sempre `http://35.231.46.76:8080/webhook/render-complete`. Nunca use `request.base_url` diretamente para gerar webhooks — proxies e clientes podem injetar `https://`, quebrando a comunicação L4 → API na porta 8080 crua (sem TLS).
