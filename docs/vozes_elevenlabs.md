@@ -12,7 +12,7 @@
 | **Harry - Fierce Warrior** | `SOYHLrjzK2X1ezoPC6cr` | premade | male | american | N/A |
 | **Liam - Energetic, Social Media Creator** | `TX3LPaxmHKxFdv7VOQHJ` | premade | male | american | N/A |
 | **Alice - Clear, Engaging Educator** | `Xb7hH8MSUJpSbSDYk0k2` | premade | female | british | N/A |
-| **Matilda - Knowledgable, Professional** | `XrExE9yKIg1WjnnlVkGX` | premade | female | american | N/A |
+| **Matilda - Knowledgable, Professional** | `XrExE9yKIg1WjnnlVkGX` | premade | female | american | **ATIVA — Avatar (pt-BR)** |
 | **Will - Relaxed Optimist** | `bIHbv24MWmeRgasZH58o` | premade | male | american | N/A |
 | **Jessica - Playful, Bright, Warm** | `cgSgspJ2msm6clMCkdW9` | premade | female | american | N/A |
 | **Eric - Smooth, Trustworthy** | `cjVigY5qzO86Huf0OWal` | premade | male | american | N/A |

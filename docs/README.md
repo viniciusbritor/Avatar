@@ -9,7 +9,7 @@ O projeto **LANA (Latent Augmented Neural Avatar)** é uma infraestrutura de pro
 - **Data Core:** Gold Disk Persistente (100GB) com checkpoints pré-carregados.
 
 ## 🎙️ Pipeline Vocal
-O projeto utiliza um pipeline híbrido da **ElevenLabs (Voz Sarah Brasil)** com otimizações de:
+O projeto utiliza um pipeline híbrido da **ElevenLabs (Voz Matilda pt-BR)** com otimizações de:
 - `stability: 0.5`
 - `similarity_boost: 0.8`
 - `atempo: 1.12x` (via FFmpeg)

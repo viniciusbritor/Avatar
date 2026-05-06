@@ -76,7 +76,7 @@ Fluxo de Renderização (GPU L4):
 
 ## Fluxo de Dados (Text-to-Video)
 
-1. `POST /produce` → ElevenLabs TTS (voz Sarah) → upload GCS → Firestore (status: queued)
+1. `POST /produce` → ElevenLabs TTS (voz Matilda pt-BR) → upload GCS → Firestore (status: queued)
 2. Background thread: provisiona VM L4 na zona com capacidade (13 zonas globais)
 3. Bootstrap: Docker pull golden image → docker cp código → docker run → industrial_main.py
 4. GPU polling: Firestore WHERE status=queued → baixa áudio → LatentSync → GFPGAN → FFmpeg

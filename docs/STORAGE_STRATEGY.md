@@ -46,7 +46,7 @@ Para garantir a segurança, rastreabilidade e escalabilidade do projeto Lana, to
 
 | Chave | Descrição | Status |
 | :--- | :--- | :--- |
-| `ELEVENLABS_API_KEY` | Acesso ao motor de voz Sarah | 🔒 Protegido |
+| `ELEVENLABS_API_KEY` | Acesso ao motor de voz Matilda (pt-BR) | 🔒 Protegido |
 | `GCP_PROJECT_ID` | brasili-ia-news | 🔒 Protegido |
 | `GCS_VAULT_BUCKET` | brasil-ai-avatars-vault | 🔒 Protegido |
 

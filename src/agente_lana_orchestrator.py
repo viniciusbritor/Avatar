@@ -24,7 +24,7 @@ L4_MACHINE = "g2-standard-12"
 ELEVENLABS_API_KEY = get_secret("ELEVEN_LABS_API_KEY")
 if ELEVENLABS_API_KEY:
     ELEVENLABS_API_KEY = ELEVENLABS_API_KEY.strip()
-VOICE_ID = get_secret("ELEVEN_VOICE_ID")  # Voz pt-BR nativa via Secret Manager (Fail-Fast se ausente)
+VOICE_ID = get_secret("ELEVEN_VOICE_ID")  # Matilda (ajustada para pt-BR) via Secret Manager
 DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden"
 
 class LanaIndustrialEngine:
@@ -673,7 +673,7 @@ class AgenteLanaOrchestrator:
                 os.makedirs(temp_dir, exist_ok=True)
             output_path = os.path.join(temp_dir, f"audio_{uuid.uuid4().hex[:8]}.mp3")
         
-        print(f"[TTS] Gerando Mariana (pt-BR nativa) para: '{text[:50]}...'")
+        print(f"[TTS] Gerando Matilda (pt-BR) para: '{text[:50]}...'")
         url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
         headers = {"Accept": "audio/mpeg", "Content-Type": "application/json", "xi-api-key": ELEVENLABS_API_KEY}
         data = {
@@ -719,8 +719,8 @@ class AgenteLanaOrchestrator:
             )
             self._update_view(i_pc=100, i_m=f"GPU Ativa em {ip}", d_pc=100, d_m="Container Pronto")
             
-            # Passo 2: Áudio (Mariana ElevenLabs pt-BR)
-            self._update_view(a_pc=10, a_m="Gerando Áudio Mariana (pt-BR)...")
+            # Passo 2: Áudio (Matilda ElevenLabs pt-BR)
+            self._update_view(a_pc=10, a_m="Gerando Áudio Matilda (pt-BR)...")
             audio_local = self.generate_audio_local(text)
             audio_gcs = self.engine.upload_assets(audio_local, job_id=job_id)
             self._update_view(a_pc=50, a_m="Áudio no Vault GCS")

@@ -29,7 +29,7 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
     - `API_SECRET_KEY` — Chave de autenticação HTTP interna entre Cérebro e Motor (header `X-API-Key`).
     - `GCP_SA_KEY` — JSON da Service Account master com acesso total ao projeto `brasili-ia-news`.
     - `ELEVEN_LABS_API_KEY` — Token da API ElevenLabs para síntese de voz (TTS).
-    - `ELEVEN_VOICE_ID` — ID da voz ElevenLabs. **Obrigatório ser voz nativa pt-BR** (ex: Mariana `H57lpZd9a8RhAccsai8Z`). NUNCA usar vozes em inglês com "ajuste" de sotaque (ex: Matilda/Sarah).
+    - `ELEVEN_VOICE_ID` — ID da voz ElevenLabs. **Matilda (`XrExE9yKIg1WjnnlVkGX`) ajustada para português-BR.** Nunca usar vozes sem ajuste de idioma.
     - `GEMINI_API_KEY` — Chave do Google Gemini para raciocínio do Maestro.
 - **Backup:** O banco SQLite `brasil_ai.db` com todas as chaves do ecossistema YouTube está espelhado em `gs://brasil-ai-avatars-vault/brasil_ai.db` como cópia de segurança offline. NÃO é usado como fonte primária em runtime.
 
