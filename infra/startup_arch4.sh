@@ -81,7 +81,7 @@ chmod -R 777 /workspace/latentsync
 
 # 10. RUN CONTAINER
 echo "--- INICIANDO CONTAINER L4 ---"
-API_KEY=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/api-key 2>/dev/null || echo "brasilai-avatar-2026")
+API_KEY=$(curl -s -f -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/api-key 2>/dev/null || echo "brasilai-avatar-2026")
 docker rm -f lana-engine 2>/dev/null
 docker run -d --name lana-engine \
     --gpus all \
