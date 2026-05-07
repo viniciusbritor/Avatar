@@ -1,9 +1,8 @@
 #!/bin/bash
-# Lana API Startup — VM e2-micro (v4 — systemd)
-# Features:
+# Lana API Startup — VM e2-micro (v4.1 — systemd + trigger GCS)
 #   - Systemd unit lana-api.service (sobrevive a restart de VM e crash)
-#   - Cron auto-update: docker pull a cada 5min → systemctl restart
-#   - Health check: se API cair 3x → systemctl restart
+#   - Trigger-based update: verifica GCS a cada 1min. Só faz docker pull
+#     quando o CI/CD escreve um trigger apos Cloud Build bem-sucedido.
 #   - Idempotente: roda seguro no boot e manualmente
 set -x
 exec > /var/log/lana-startup.log 2>&1
@@ -30,10 +29,10 @@ for i in $(seq 1 5); do
     sleep 10
 done
 
-# 4. Instalar systemd unit (idempotente — roda na VM host, NÃO no container)
+# 4. Instalar systemd unit (idempotente)
 cat > /etc/systemd/system/lana-api.service << 'UNITEOF'
 [Unit]
-Description=Brasil AI — Avatar API (v3.2.1)
+Description=Brasil AI — Avatar API (v3.2.2)
 After=network.target docker.service
 Requires=docker.service
 
@@ -55,36 +54,27 @@ systemctl daemon-reload
 systemctl enable lana-api.service
 systemctl restart lana-api.service
 
-# 5. Auto-update via cron (a cada 5min verifica imagem nova)
-cat > /usr/local/bin/lana-auto-update.sh << 'CRONEOF'
+# 5. Trigger-based update (CI/CD escreve trigger no GCS apos build)
+cat > /usr/local/bin/lana-trigger-update.sh << 'TRIGEOF'
 #!/bin/bash
+TRIGGER="gs://brasil-ai-avatars-vault/triggers/lana-api-update.txt"
+STATE_FILE="/var/lib/lana-api/last-trigger-ts"
 IMAGE="us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest"
-BEFORE=$(docker inspect --format='{{.Id}}' $IMAGE 2>/dev/null || echo "")
-docker pull $IMAGE --quiet 2>/dev/null
-AFTER=$(docker inspect --format='{{.Id}}' $IMAGE 2>/dev/null || echo "")
-if [ -n "$BEFORE" ] && [ -n "$AFTER" ] && [ "$BEFORE" != "$AFTER" ]; then
-    echo "[AUTO-UPDATE] Nova imagem detectada. Reiniciando..."
-    systemctl restart lana-api.service
-fi
-CRONEOF
-chmod +x /usr/local/bin/lana-auto-update.sh
-(crontab -l 2>/dev/null; echo "*/5 * * * * /usr/local/bin/lana-auto-update.sh") | crontab -
+mkdir -p /var/lib/lana-api
 
-# 6. Health check auto-restart (a cada 1min)
-cat > /usr/local/bin/lana-health-check.sh << 'HEALEOF'
-#!/bin/bash
-FAILS=0
-for i in $(seq 1 3); do
-    if curl -s --connect-timeout 3 http://localhost:8080/health > /dev/null 2>&1; then
-        exit 0
-    fi
-    FAILS=$((FAILS+1))
-    sleep 5
-done
-echo "[HEALTH-CHECK] API falhou $FAILS vezes. Reiniciando..."
-systemctl restart lana-api.service
-HEALEOF
-chmod +x /usr/local/bin/lana-health-check.sh
-(crontab -l 2>/dev/null; echo "* * * * * /usr/local/bin/lana-health-check.sh") | crontab -
+REMOTE_TS=$(gsutil cp "$TRIGGER" - 2>/dev/null | head -1 | tr -d '\n\r ')
+[ -z "$REMOTE_TS" ] && exit 0
+
+LOCAL_TS=$(cat "$STATE_FILE" 2>/dev/null)
+if [ "$REMOTE_TS" != "$LOCAL_TS" ]; then
+    echo "[TRIGGER-UPDATE] $(date): new trigger detected. Pulling..."
+    docker pull "$IMAGE"
+    docker image prune -f
+    systemctl restart lana-api.service
+    echo "$REMOTE_TS" > "$STATE_FILE"
+fi
+TRIGEOF
+chmod +x /usr/local/bin/lana-trigger-update.sh
+(crontab -l 2>/dev/null; echo "* * * * * /usr/local/bin/lana-trigger-update.sh") | crontab -
 
 echo "=== BOOT COMPLETE ==="
