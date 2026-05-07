@@ -41,6 +41,8 @@ jobs:
       - name: Cloud Build (L4 Golden)
         run: |
           gcloud auth list
+          gcloud config list
+          gcloud projects describe brasili-ia-news
           gcloud builds submit \
             --account=avatar-api-sa@brasili-ia-news.iam.gserviceaccount.com \
             --config=cloudbuild-l4-golden.yaml \
