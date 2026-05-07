@@ -41,7 +41,9 @@ jobs:
 
       - name: Cloud Build (API)
         run: |
+          gcloud auth list
           gcloud builds submit \
+            --account=avatar-api-sa@brasili-ia-news.iam.gserviceaccount.com \
             --config=cloudbuild-api.yaml \
             --region=us-east1 \
             --project=brasili-ia-news \
