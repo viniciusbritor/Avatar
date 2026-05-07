@@ -1,5 +1,9 @@
 name: CI/CD - L4 Golden Image
 
+permissions:
+  id-token: write
+  contents: read
+
 on:
   push:
     branches: [master]

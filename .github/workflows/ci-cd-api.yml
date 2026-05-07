@@ -1,5 +1,9 @@
 name: CI/CD - API (e2-micro)
 
+permissions:
+  id-token: write
+  contents: read
+
 on:
   push:
     branches: [master]
