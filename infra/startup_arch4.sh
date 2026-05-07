@@ -82,7 +82,7 @@ docker rm "$TEMP_CONTAINER"
 chmod -R 777 /workspace/src
 chmod -R 777 /workspace/latentsync
 
-# 10. RUN CONTAINER
+# 10. RUN CONTAINER (com auto-recovery CUDA)
 echo "--- INICIANDO CONTAINER L4 ---"
 docker rm -f lana-engine 2>/dev/null
 docker run -d --name lana-engine \
@@ -94,6 +94,23 @@ docker run -d --name lana-engine \
     -v /mnt/weights:/mnt/weights \
     us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden \
     python3 /workspace/src/industrial_main.py
+
+# Auto-recovery: se CUDA falhar (Docker acabou de reiniciar, runtime NVIDIA
+# ainda nao estabilizou), recria o container — igual stop+rm+run manual.
+sleep 8
+if ! docker exec lana-engine python3 -c "import torch; assert torch.cuda.is_available()" 2>/dev/null; then
+    echo "[BOOT] CUDA falhou no primeiro start, recriando container..."
+    docker rm -f lana-engine
+    docker run -d --name lana-engine \
+        --gpus all \
+        --network host \
+        --restart=no \
+        -e API_SECRET_KEY="brasilai-avatar-2026" \
+        -v /workspace:/workspace \
+        -v /mnt/weights:/mnt/weights \
+        us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden \
+        python3 /workspace/src/industrial_main.py
+fi
 
 # 11. SENTINEL NO HOST (systemd — roda FORA do container)
 #    Se o container morrer → shutdown em MAX_DEAD_CYCLES
