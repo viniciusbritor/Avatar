@@ -41,6 +41,9 @@ RUN sed -i 's/archive.ubuntu.com/us-east1.gce.archive.ubuntu.com/' /etc/apt/sour
 # LAYER 2: Dependencies (LatentSync + API)
 # ═══════════════════════════════════════════════════════════════════════════
 COPY latentsync/requirements.txt /tmp/latentsync-requirements.txt
+# Valida que o submodule foi inicializado (git submodule update --init)
+RUN test -s /tmp/latentsync-requirements.txt || \
+    (echo "FATAL: latentsync submodule nao inicializado. Rode: git submodule update --init" && exit 1)
 
 RUN sed -i 's/decord==0.6.0/eva-decord>=0.6.0/' /tmp/latentsync-requirements.txt && \
     sed -i 's/DeepCache==0.1.1/git+https:\/\/github.com\/horseee\/DeepCache.git/' /tmp/latentsync-requirements.txt && \

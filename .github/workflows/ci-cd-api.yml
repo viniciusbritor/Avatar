@@ -1,0 +1,45 @@
+name: CI/CD - API (e2-micro)
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'api/**'
+      - 'src/**'
+      - 'infra/boot/**'
+      - 'infra/services/**'
+      - 'infra/docker/**'
+      - 'infra/reference/**'
+      - 'cloudbuild-api.yaml'
+      - '.github/workflows/ci-cd-api.yml'
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    name: Build & Push API Image
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Auth GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: brasili-ia-news
+
+      - name: Cloud Build (API)
+        run: |
+          gcloud builds submit \
+            --config=cloudbuild-api.yaml \
+            --region=us-east1 \
+            --project=brasili-ia-news \
+            .

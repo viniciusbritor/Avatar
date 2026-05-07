@@ -21,7 +21,7 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 - **Orquestrador:** Agente Lana (Maestro via Agno/Phidata).
 - **Segurança:** Autenticação via `X-API-Key` (token interno simples entre VMs na mesma VPC).
 - **Missão:** Receber requisições, gerar áudio (ElevenLabs), enfileirar job no Firestore, e disparar GPU L4 sob demanda.
-- **Deploy:** Cloud Build gera imagem → Artifact Registry → VM puxa via cron a cada 5 min (`infra/startup-e2-micro.sh`).
+- **Deploy:** Cloud Build gera imagem → Artifact Registry → VM puxa via cron a cada 5 min (`infra/boot/startup-e2-micro.sh`).
 
 ### 2.2 Cofre de Segredos (GCP Secret Manager — Free Tier)
 - **Source of Truth único** para todas as credenciais do ecossistema.

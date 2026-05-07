@@ -41,17 +41,8 @@ lifecycle.json
 # CI/triggers locais
 trigger_and_download.py
 
-# Dockerfiles antigos (não são contexto de build)
-infra/Dockerfile.avatar-l4-v2.8
-infra/Dockerfile.l4
-infra/Dockerfile.t4
-infra/Dockerfile.runpod
-
-# Scripts de boot antigos
-infra/boot_industrial_v18.sh
-infra/boot_industrial_v19_baked.sh
-infra/prepare_container.sh
-infra/startup-script.sh
+# Scripts e Dockerfiles legados (infra/legacy/)
+infra/legacy/
 
 # testes
 tests/

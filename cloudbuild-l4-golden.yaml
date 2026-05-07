@@ -10,7 +10,7 @@ steps:
       - '-t'
       - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden'
       - '-f'
-      - 'infra/Dockerfile.avatar-l4-v2.10-golden'
+      - 'infra/docker/Dockerfile.avatar-l4-v2.10-golden'
       - '.'
 
   - name: 'gcr.io/cloud-builders/docker'

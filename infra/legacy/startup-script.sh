@@ -16,6 +16,6 @@ mkdir -p /workspace/logs
 
 # 3. Executar Boot Industrial (Auto-detecção L4/T4)
 chmod +x /workspace/infra/*.sh
-bash /workspace/infra/boot_industrial_v18.sh
+bash /workspace/infra/legacy/boot_industrial_v18.sh
 
 echo "[LANA] Motor pronto. Monitoramento de custos e dashboard ATIVOS."

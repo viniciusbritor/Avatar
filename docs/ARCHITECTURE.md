@@ -62,11 +62,11 @@ Fluxo de Renderização (GPU L4):
 ### Infraestrutura (infra/)
 | Arquivo | Função |
 |---------|--------|
-| `infra/startup_arch4.sh` | Script de boot da GPU L4: Docker, NVIDIA toolkit, GCS Fuse, docker cp código, container |
-| `infra/startup-e2-micro.sh` | Script de boot da VM API: Docker, systemd unit, auto-update cron |
-| `infra/lana-api.service` | Systemd unit: API sobrevive a restart de VM e crash |
-| `infra/Dockerfile.avatar-l4-v2.10-golden` | Imagem Docker GPU: CUDA 12.1 + PyTorch + Diffusers + LatentSync |
-| `infra/lana-finops-sentinel.sh` | Watchdog de inatividade (legado, substituído pelo Sentinel HOST no startup_arch4.sh) |
+| `infra/boot/startup_arch4.sh` | Script de boot da GPU L4: Docker, NVIDIA toolkit, GCS Fuse, docker cp código, container |
+| `infra/boot/startup-e2-micro.sh` | Script de boot da VM API: Docker, systemd unit, auto-update cron |
+| `infra/services/lana-api.service` | Systemd unit: API sobrevive a restart de VM e crash |
+| `infra/docker/Dockerfile.avatar-l4-v2.10-golden` | Imagem Docker GPU: CUDA 12.1 + PyTorch + Diffusers + LatentSync |
+| `infra/legacy/lana-finops-sentinel.sh` | Watchdog de inatividade (legado, substituído pelo Sentinel HOST no startup_arch4.sh) |
 
 ### Deploy
 | Arquivo | Função |

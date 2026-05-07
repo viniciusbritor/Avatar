@@ -7,7 +7,7 @@ via Dockerfile). O código original em src/ não é tocado.
 
 Diferenças em relação ao engine local (Windows):
   - startup_script_path: lido via env var STARTUP_SCRIPT_PATH
-    (padrão: /app/infra/startup_arch4.sh, dentro do container)
+    (padrão: /app/infra/boot/startup_arch4.sh, dentro do container)
   - Sem dependências de caminhos Windows (c:/Users/vinic/...)
 """
 
@@ -33,7 +33,7 @@ class CloudLanaEngine(LanaIndustrialEngine):
         """Cria instância L4 com startup script do container."""
         startup_script_path = os.getenv(
             "STARTUP_SCRIPT_PATH",
-            "/app/infra/startup_arch4.sh"
+            "/app/infra/boot/startup_arch4.sh"
         )
         if not os.path.exists(startup_script_path):
             return False, f"Startup script não encontrado: {startup_script_path}"

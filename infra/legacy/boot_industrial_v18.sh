@@ -57,6 +57,6 @@ echo "[BOOT] Sistema pronto para orquestração Agno."
 
 # 4. Iniciar Sentinela de Custos
 echo "[FINOPS] Disparando Sentinela Zero-Waste..."
-nohup bash /workspace/infra/lana-finops-sentinel.sh > /workspace/sentinel.log 2>&1 &
+nohup bash /workspace/infra/legacy/lana-finops-sentinel.sh > /workspace/sentinel.log 2>&1 &
 
 echo "[SUCESSO] Ambiente Industrial Ativo ($GPU_NAME)."

@@ -1,4 +1,0 @@
-# ⚠️ DEPRECATED — use infra/requirements-l4.txt como referência canônica
-# Este arquivo está desatualizado. As dependências corretas estão em:
-#   infra/requirements-l4.txt (documentação)
-#   infra/Dockerfile.avatar-l4-v2.10 (Dockerfile com layers otimizadas)

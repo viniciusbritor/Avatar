@@ -119,7 +119,7 @@ def _spawn_gpu():
                      "--boot-disk-size=150GB",
                      "--provisioning-model=STANDARD",
                      "--maintenance-policy=TERMINATE",
-                     "--metadata-from-file=startup-script=/app/infra/startup_arch4.sh",
+                     "--metadata-from-file=startup-script=/app/infra/boot/startup_arch4.sh",
                      "--scopes=cloud-platform", "--quiet", "--verbosity=none"],
                     capture_output=True, text=True, timeout=120
                 )
