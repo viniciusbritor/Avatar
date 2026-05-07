@@ -41,8 +41,12 @@ jobs:
       - name: Cloud Build (L4 Golden)
         run: |
           gcloud auth list
-          gcloud config list
-          gcloud projects describe brasili-ia-news
+          echo "--- Testing builds.list ---"
+          gcloud builds list --project=brasili-ia-news --region=us-east1 --limit=1
+          echo "--- Testing builds.submit with --no-source ---"
+          gcloud builds submit --no-source --config=cloudbuild-l4-golden.yaml --region=us-east1 --project=brasili-ia-news --async
+          echo "--- If we got here, SA has Cloud Build API access ---"
+          echo "--- Trying full submit ---"
           gcloud builds submit \
             --account=avatar-api-sa@brasili-ia-news.iam.gserviceaccount.com \
             --config=cloudbuild-l4-golden.yaml \
