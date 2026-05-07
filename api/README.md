@@ -29,10 +29,11 @@ Credenciais de APIs externas (ElevenLabs, Gemini) são obtidas em runtime via `s
 | Secret | Finalidade |
 |--------|-----------|
 | `API_SECRET_KEY` | Token interno HTTP — Cérebro ↔ Motor |
-| `GCP_SA_KEY` | JSON da Service Account master |
 | `ELEVEN_LABS_API_KEY` | ElevenLabs TTS |
 | `ELEVEN_VOICE_ID` | Voz Matilda (pt-BR) |
 | `GEMINI_API_KEY` | Google Gemini (Maestro) |
+
+**CI/CD Authentication:** GitHub Actions usa Workload Identity Federation (OIDC) — sem chaves exportadas. A Service Account `github-actions-sa@brasili-ia-news.iam.gserviceaccount.com` tem permissões granulares (least-privilege) vinculadas ao repositório `viniciusbritor/Avatar`.
 
 **Backup offline:** `gs://brasil-ai-avatars-vault/brasil_ai.db` (SQLite com todas as chaves do ecossistema YouTube). Não usado em runtime.
 

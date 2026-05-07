@@ -4,6 +4,7 @@
 brasil_ai.db
 .env
 *.db
+key/
 
 # Modelos e Pesos (Ja imortalizados no GCP via Snapshot)
 *.pth

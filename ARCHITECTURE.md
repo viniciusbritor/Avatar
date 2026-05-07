@@ -25,9 +25,8 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 
 ### 2.2 Cofre de Segredos (GCP Secret Manager — Free Tier)
 - **Source of Truth único** para todas as credenciais do ecossistema.
-- **Secrets ativas (5/6 do Free Tier):**
+- **Secrets ativas (4/6 do Free Tier):**
     - `API_SECRET_KEY` — Token simples de autenticação HTTP entre Cérebro e Motor (header `X-API-Key`).
-    - `GCP_SA_KEY` — JSON da Service Account master com acesso total ao projeto `brasili-ia-news`.
     - `ELEVEN_LABS_API_KEY` — Token da API ElevenLabs para síntese de voz (TTS).
     - `ELEVEN_VOICE_ID` — ID da voz ElevenLabs. **Matilda (`XrExE9yKIg1WjnnlVkGX`) ajustada para português-BR.** Nunca usar vozes sem ajuste de idioma.
     - `GEMINI_API_KEY` — Chave do Google Gemini para raciocínio do Maestro.
@@ -70,6 +69,20 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 
 ---
 
+### 2.6 Workload Identity Federation (CI/CD — GitHub Actions)
+- **Autenticação sem chaves:** Os workflows do GitHub Actions (`.github/workflows/`) usam Workload Identity Federation (OIDC) em vez de Service Account Keys exportadas. Zero long-lived credentials.
+- **Pool:** `github-actions-pool` (global) com provider OIDC apontado para `https://token.actions.githubusercontent.com`.
+- **Service Account:** `github-actions-sa@brasili-ia-news.iam.gserviceaccount.com` (least-privilege — Cloud Build Editor + Artifact Registry Writer + Secret Manager Accessor + GCS Object Admin condicionado ao vault).
+- **Atributo de bind:** `attribute.repository/viniciusbritor/Avatar` — só workflows desse repositório podem obter tokens federados.
+- **IAM roles mínimas:**
+    - `roles/cloudbuild.builds.editor` — Submeter builds para Cloud Build.
+    - `roles/artifactregistry.writer` — Push de imagens Docker.
+    - `roles/secretmanager.secretAccessor` — Ler secrets do Secret Manager.
+    - `roles/storage.objectAdmin` — Leitura/escrita condicionada ao bucket `brasil-ai-avatars-vault`.
+    - `roles/logging.logWriter` — Logs operacionais.
+    - `roles/iam.serviceAccountUser` — Impersonação para Cloud Build.
+- **O segredo `GCP_SA_KEY` foi removido** do Secret Manager e do GitHub Actions Secrets. Não há mais chave JSON armazenada em lugar nenhum.
+
 ## 4. Regras de Ouro para Agentes IA
 - **NUNCA** mude versões de pacotes em `requirements.txt` sem validar o grafo de dependências (especialmente Protobuf).
 - **SEMPRE** use credenciais de APIs externas (ElevenLabs, Gemini) vindas do GCP Secret Manager. Tokens internos simples (ex: `API_SECRET_KEY`) podem usar fallback em código.
@@ -79,6 +92,7 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 - **WEBHOOK URL** deve ser sempre `http://35.231.46.76:8080/webhook/render-complete` (hardcoded). Nunca use `request.base_url` — proxies e clientes podem injetar `https://`, quebrando a comunicação L4 → API na porta 8080 crua (sem TLS).
 - **L4 BOOT:** O código Python do worker (`src/industrial_main.py`) deve ser obtido via `git clone` do repositório GitHub no startup script. NUNCA use `docker cp` da imagem golden (código congelado causa regressão de bugs).
 - **ZONE FALLBACK:** Se `us-east1-b` estiver sem capacidade (`ZONE_RESOURCE_POOL_EXHAUSTED`), migrar para `us-east1-c` ou `us-east1-d`. O IP estático `35.231.46.76` é regional e acompanha a migração.
+- **ZERO SA KEYS:** NUNCA adicione `credentials_json` ou Service Account Keys nos workflows. Use exclusivamente Workload Identity Federation (`workload_identity_provider` + `service_account`). Chaves exportadas são proibidas — tokens OIDC de curta duração são o único meio de autenticação CI/CD.
 
 ---
 

@@ -50,6 +50,8 @@ Para garantir a segurança, rastreabilidade e escalabilidade do projeto Lana, to
 | `GCP_PROJECT_ID` | brasili-ia-news | 🔒 Protegido |
 | `GCS_VAULT_BUCKET` | brasil-ai-avatars-vault | 🔒 Protegido |
 
+**CI/CD Auth (Workload Identity Federation):** GitHub Actions autentica via OIDC (pool `github-actions-pool`), sem Service Account Key exportada. SA dedicada `github-actions-sa@brasili-ia-news.iam.gserviceaccount.com` com least-privilege:
+
 > [!IMPORTANT]
 > **Próximo Passo:** Migrar a chave do ElevenLabs que ainda está hardcoded no `agente_lana_orchestrator.py` para o `secrets_manager`.
 

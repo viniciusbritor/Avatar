@@ -26,24 +26,22 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Authenticate to GCP (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: brasili-ia-news
+          workload_identity_provider: 'projects/180096224219/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider'
+          service_account: 'github-actions-sa@brasili-ia-news.iam.gserviceaccount.com'
+
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: brasili-ia-news
 
-      - name: Auth GCP
-        env:
-          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-        run: |
-          echo "$GCP_SA_KEY" > /tmp/gcp-sa.json
-          gcloud auth activate-service-account --key-file=/tmp/gcp-sa.json
-          rm /tmp/gcp-sa.json
-
       - name: Cloud Build (API)
         run: |
           gcloud auth list
           gcloud builds submit \
-            --account=avatar-api-sa@brasili-ia-news.iam.gserviceaccount.com \
             --config=cloudbuild-api.yaml \
             --region=us-east1 \
             --project=brasili-ia-news \
