@@ -55,9 +55,9 @@ systemctl enable lana-api.service
 systemctl restart lana-api.service
 
 # 5. Trigger-based update (CI/CD escreve trigger no GCS apos build)
-#    Ao detectar imagem nova, extrai systemd unit e trigger via docker cp
-#    (sem rodar container extra — evita OOM na e2-micro).
-#    Depois aplica, limpa imagens velhas e reinicia.
+#    Detecta imagem nova, faz pull, limpa imagens velhas e reinicia.
+#    NAO reexecuta o startup script — ele e so para boot da VM.
+#    Mudancas de host (systemd, cron) exigem reboot ou SSH manual.
 cat > /usr/local/bin/lana-trigger-update.sh << 'TRIGEOF'
 #!/bin/bash
 TRIGGER="gs://brasil-ai-avatars-vault/triggers/lana-api-update.txt"
@@ -72,15 +72,8 @@ LOCAL_TS=$(cat "$STATE_FILE" 2>/dev/null)
 if [ "$REMOTE_TS" != "$LOCAL_TS" ]; then
     echo "[TRIGGER-UPDATE] $(date): new trigger detected. Pulling..."
     docker pull "$IMAGE"
-    echo "[TRIGGER-UPDATE] Updating host config from new image..."
-    CID=$(docker create "$IMAGE")
-    docker cp "$CID:/app/infra/boot/startup-e2-micro.sh" /tmp/lana-startup-new.sh 2>/dev/null
-    docker rm "$CID" > /dev/null 2>&1
-    if [ -s /tmp/lana-startup-new.sh ]; then
-        chmod +x /tmp/lana-startup-new.sh
-        bash /tmp/lana-startup-new.sh
-    fi
     docker image prune -f
+    systemctl restart lana-api.service
     echo "$REMOTE_TS" > "$STATE_FILE"
 fi
 TRIGEOF
