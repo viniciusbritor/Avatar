@@ -1,3 +1,3 @@
 [submodule "latentsync"]
 	path = latentsync
-	url = https://github.com/viniciusbritor/LatentSync.git
+	url = https://github.com/bytedance/LatentSync.git
