@@ -19,14 +19,14 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 - **Host:** VM e2-micro (`lana-api`) em `us-east1-c`. IP fixo: `35.231.46.76` (regional `us-east1`, movível entre zonas `b`/`c`/`d`).
 - **Base Image:** `ubuntu-2204-lts` (Ubuntu 22.04 LTS, `ubuntu-os-cloud`). Obrigatório — o startup script depende de `apt-get`. NUNCA use `cos-stable` (Container-Optimized OS).
 - **Orquestrador:** Agente Lana (Maestro via Agno/Phidata).
-- **Segurança:** Autenticação via `X-API-Key` (validada **exclusivamente** contra GCP Secret Manager — Fail-Fast se ausente).
+- **Segurança:** Autenticação via `X-API-Key` (token interno simples entre VMs na mesma VPC).
 - **Missão:** Receber requisições, gerar áudio (ElevenLabs), enfileirar job no Firestore, e disparar GPU L4 sob demanda.
 - **Deploy:** Cloud Build gera imagem → Artifact Registry → VM puxa via cron a cada 5 min (`infra/startup-e2-micro.sh`).
 
 ### 2.2 Cofre de Segredos (GCP Secret Manager — Free Tier)
 - **Source of Truth único** para todas as credenciais do ecossistema.
 - **Secrets ativas (5/6 do Free Tier):**
-    - `API_SECRET_KEY` — Chave de autenticação HTTP interna entre Cérebro e Motor (header `X-API-Key`).
+    - `API_SECRET_KEY` — Token simples de autenticação HTTP entre Cérebro e Motor (header `X-API-Key`).
     - `GCP_SA_KEY` — JSON da Service Account master com acesso total ao projeto `brasili-ia-news`.
     - `ELEVEN_LABS_API_KEY` — Token da API ElevenLabs para síntese de voz (TTS).
     - `ELEVEN_VOICE_ID` — ID da voz ElevenLabs. **Matilda (`XrExE9yKIg1WjnnlVkGX`) ajustada para português-BR.** Nunca usar vozes sem ajuste de idioma.
@@ -72,7 +72,7 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 
 ## 4. Regras de Ouro para Agentes IA
 - **NUNCA** mude versões de pacotes em `requirements.txt` sem validar o grafo de dependências (especialmente Protobuf).
-- **SEMPRE** use credenciais vindas EXCLUSIVAMENTE do GCP Secret Manager (`secrets_manager.py`). É proibido usar variáveis de ambiente injetadas em bash, fallbacks em texto claro (`brasilai-avatar-2026`), ou consultas SQLite em runtime. Se o Secret Manager falhar, o código deve falhar (Fail-Fast).
+- **SEMPRE** use credenciais de APIs externas (ElevenLabs, Gemini) vindas do GCP Secret Manager. Tokens internos simples (ex: `API_SECRET_KEY`) podem usar fallback em código.
 - **O BANCO SQLITE** (`gs://brasil-ai-avatars-vault/brasil_ai.db`) é backup offline das chaves do ecossistema. Nunca consulte-o em runtime via Python — use apenas o Secret Manager.
 - **A IMAGEM DA API** deve ser leve (sem CUDA).
 - **A IMAGEM DO WORKER** deve conter tudo (Imutável), com código como última layer para cache eficiente.

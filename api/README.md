@@ -28,7 +28,7 @@ Todas as credenciais são obtidas em runtime via `secrets_manager.py` consultand
 
 | Secret | Finalidade |
 |--------|-----------|
-| `API_SECRET_KEY` | Auth HTTP entre Cérebro e Motor |
+| `API_SECRET_KEY` | Token interno HTTP — Cérebro ↔ Motor |
 | `GCP_SA_KEY` | JSON da Service Account master |
 | `ELEVEN_LABS_API_KEY` | ElevenLabs TTS |
 | `ELEVEN_VOICE_ID` | Voz Matilda (pt-BR) |

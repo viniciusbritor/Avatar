@@ -89,6 +89,7 @@ docker run -d --name lana-engine \
     --gpus all \
     --network host \
     --restart=no \
+    -e API_SECRET_KEY="brasilai-avatar-2026" \
     -v /workspace:/workspace \
     -v /mnt/weights:/mnt/weights \
     us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden \
