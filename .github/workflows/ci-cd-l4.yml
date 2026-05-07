@@ -30,26 +30,19 @@ jobs:
         with:
           project_id: brasili-ia-news
 
-      - name: Auth GCP
+      - name: Auth GCP + Cloud Build
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
         run: |
           echo "$GCP_SA_KEY" > /tmp/gcp-sa.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-sa.json
           gcloud auth activate-service-account --key-file=/tmp/gcp-sa.json
-          rm /tmp/gcp-sa.json
-
-      - name: Cloud Build (L4 Golden)
-        run: |
+          gcloud config set project brasili-ia-news
           gcloud auth list
-          echo "--- Testing builds.list ---"
-          gcloud builds list --project=brasili-ia-news --region=us-east1 --limit=1
-          echo "--- Testing builds.submit with --no-source ---"
-          gcloud builds submit --no-source --config=cloudbuild-l4-golden.yaml --region=us-east1 --project=brasili-ia-news --async
-          echo "--- If we got here, SA has Cloud Build API access ---"
-          echo "--- Trying full submit ---"
           gcloud builds submit \
-            --account=avatar-api-sa@brasili-ia-news.iam.gserviceaccount.com \
             --config=cloudbuild-l4-golden.yaml \
             --region=us-east1 \
             --project=brasili-ia-news \
+            --async \
             .
+          rm /tmp/gcp-sa.json
