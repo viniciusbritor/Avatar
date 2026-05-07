@@ -55,15 +55,14 @@ systemctl enable lana-api.service
 systemctl restart lana-api.service
 
 # 5. Trigger-based update (CI/CD escreve trigger no GCS apos build)
-#    Ao detectar imagem nova, extrai o startup script dela e reexecuta.
-#    Isso garante que mudancas no host (systemd, cron, Docker config)
-#    tambem propagam automaticamente — nao so o codigo Python.
+#    Ao detectar imagem nova, extrai systemd unit e trigger via docker cp
+#    (sem rodar container extra — evita OOM na e2-micro).
+#    Depois aplica, limpa imagens velhas e reinicia.
 cat > /usr/local/bin/lana-trigger-update.sh << 'TRIGEOF'
 #!/bin/bash
 TRIGGER="gs://brasil-ai-avatars-vault/triggers/lana-api-update.txt"
 STATE_FILE="/var/lib/lana-api/last-trigger-ts"
 IMAGE="us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest"
-STARTUP_SCRIPT="/app/infra/boot/startup-e2-micro.sh"
 mkdir -p /var/lib/lana-api
 
 REMOTE_TS=$(gsutil cp "$TRIGGER" - 2>/dev/null | head -1 | tr -d '\n\r ')
@@ -73,12 +72,15 @@ LOCAL_TS=$(cat "$STATE_FILE" 2>/dev/null)
 if [ "$REMOTE_TS" != "$LOCAL_TS" ]; then
     echo "[TRIGGER-UPDATE] $(date): new trigger detected. Pulling..."
     docker pull "$IMAGE"
-    echo "[TRIGGER-UPDATE] Applying host config from new image..."
-    docker run --rm --entrypoint /bin/bash "$IMAGE" -c "cat $STARTUP_SCRIPT" > /tmp/lana-startup-new.sh
-    chmod +x /tmp/lana-startup-new.sh
-    bash /tmp/lana-startup-new.sh
+    echo "[TRIGGER-UPDATE] Updating host config from new image..."
+    CID=$(docker create "$IMAGE")
+    docker cp "$CID:/app/infra/boot/startup-e2-micro.sh" /tmp/lana-startup-new.sh 2>/dev/null
+    docker rm "$CID" > /dev/null 2>&1
+    if [ -s /tmp/lana-startup-new.sh ]; then
+        chmod +x /tmp/lana-startup-new.sh
+        bash /tmp/lana-startup-new.sh
+    fi
     docker image prune -f
-    systemctl restart lana-api.service
     echo "$REMOTE_TS" > "$STATE_FILE"
 fi
 TRIGEOF
