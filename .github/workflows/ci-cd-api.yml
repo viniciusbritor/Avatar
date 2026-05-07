@@ -49,4 +49,5 @@ jobs:
             --config=cloudbuild-api.yaml \
             --region=us-east1 \
             --project=brasili-ia-news \
+            --gcs-source-staging-dir=gs://brasil-ai-avatars-vault/cloudbuild-source/api \
             .

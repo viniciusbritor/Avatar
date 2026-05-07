@@ -49,4 +49,5 @@ jobs:
             --region=us-east1 \
             --project=brasili-ia-news \
             --async \
+            --gcs-source-staging-dir=gs://brasil-ai-avatars-vault/cloudbuild-source/l4 \
             .
