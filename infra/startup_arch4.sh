@@ -70,15 +70,15 @@ rm -rf /workspace/latentsync/checkpoints
 ln -sfn /mnt/weights /workspace/latentsync/checkpoints
 chmod -R 777 /workspace
 
-# 9. OBTER CÓDIGO PYTHON MAIS RECENTE DO GITHUB (MASTER)
-#    Garante que a GPU sempre usará os scripts (e as chaves de segurança) atualizados, 
-#    sem importar código velho congelado na imagem golden.
-echo "--- CLONANDO CODIGO FRESCO DO REPOSITORIO ---"
-rm -rf /tmp/avatar_repo
-git clone --recurse-submodules https://github.com/viniciusbritor/Avatar.git /tmp/avatar_repo
-rm -rf /workspace/src
-cp -r /tmp/avatar_repo/src /workspace/src
-cp -rn /tmp/avatar_repo/latentsync/. /workspace/latentsync/ 2>/dev/null || true
+# 9. COPIAR CÓDIGO PYTHON DA IMAGEM PARA O HOST
+#    A imagem golden tem os scripts em /workspace/src/,
+#    mas o mount -v /workspace:/workspace esconde eles.
+#    Extraímos para /workspace/src/ no host antes de rodar.
+echo "--- EXTRAINDO CODIGO PYTHON DA IMAGEM ---"
+TEMP_CONTAINER=$(docker create us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden)
+docker cp "$TEMP_CONTAINER:/workspace/src" /workspace/src
+docker cp "$TEMP_CONTAINER:/workspace/latentsync/." /workspace/latentsync
+docker rm "$TEMP_CONTAINER"
 chmod -R 777 /workspace/src
 chmod -R 777 /workspace/latentsync
 
@@ -92,7 +92,7 @@ docker run -d --name lana-engine \
     -v /workspace:/workspace \
     -v /mnt/weights:/mnt/weights \
     us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden \
-    /bin/bash -c "pip install -q google-cloud-secretmanager 2>/dev/null; python3 /workspace/src/industrial_main.py"
+    python3 /workspace/src/industrial_main.py
 
 # 11. SENTINEL NO HOST (systemd — roda FORA do container)
 #    Se o container morrer → shutdown em MAX_DEAD_CYCLES
