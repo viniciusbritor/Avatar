@@ -42,6 +42,33 @@ class LanaIndustrialEngine:
         self.current_gpu_type = "L4"
         self.bucket_name = BUCKET_NAME
 
+    def _run_cli(self, cmd, **kwargs):
+        kwargs.setdefault("capture_output", True)
+        kwargs.setdefault("text", True)
+        kwargs.setdefault("stdin", subprocess.DEVNULL)
+        kwargs.setdefault("encoding", "utf-8")
+        kwargs.setdefault("errors", "ignore")
+        
+        # Correcao Windows: shell=True quebra listas. Usar direto sem shell.
+        use_shell = kwargs.pop("shell", False)
+        if isinstance(cmd, list):
+            if sys.platform == "win32":
+                # No Windows, gcloud é gcloud.cmd e precisa shell=True as vezes,
+                # mas com shell=True a lista deve ser passada como string citada.
+                # Para facilitar, usar lista direta sem shell, mas o OS precisa
+                # encontrar o 'gcloud'. Se for apenas string, manter shell=True.
+                use_shell = False
+                
+                # Para gcloud no Windows encontrar o .cmd sem shell=True
+                if cmd[0] == "gcloud":
+                    cmd[0] = "gcloud.cmd"
+            else:
+                use_shell = False
+        else:
+            use_shell = True
+            
+        return subprocess.run(cmd, shell=use_shell, **kwargs)
+
     def _run_ssh_cmd(self, cmd_list, use_y=True, capture=True):
         if isinstance(cmd_list, str):
             cmd_list = cmd_list.split()
@@ -58,14 +85,7 @@ class LanaIndustrialEngine:
                     "--ssh-flag=-o LogLevel=ERROR"
                 ]
 
-        res = subprocess.run(
-            cmd_list,
-            capture_output=capture,
-            text=True,
-            stdin=subprocess.DEVNULL,
-            encoding="utf-8",
-            errors="ignore"
-        )
+        res = self._run_cli(cmd_list, capture_output=capture)
         return res
 
     def _test_ssh(self, name, zone, max_retries=15, progress_callback=None):
@@ -97,8 +117,7 @@ class LanaIndustrialEngine:
             "--project", self.project_id,
             "--quiet"
         ]
-        res = subprocess.run(cmd, capture_output=True, text=True,
-                             stdin=subprocess.DEVNULL, encoding="utf-8", errors="ignore")
+        res = self._run_cli(cmd)
         if res.returncode == 0 and res.stdout.strip():
             try:
                 import json
@@ -203,22 +222,20 @@ class LanaIndustrialEngine:
     def _purge_zone(self, name, zone):
         """Purga absoluta de qualquer recurso na região para garantir Zero-Waste."""
         print(f"[ZERO-WASTE] Purgando {name} em {zone}...")
-        subprocess.run(
+        self._run_cli(
             ["gcloud", "compute", "instances", "delete", name,
              "--project", self.project_id, "--zone", zone,
-             "--delete-disks=all", "--quiet"],
-            capture_output=True, stdin=subprocess.DEVNULL
+             "--delete-disks=all", "--quiet"]
         )
-        subprocess.run(
+        self._run_cli(
             ["gcloud", "compute", "disks", "delete", name,
-             "--project", self.project_id, "--zone", zone, "--quiet"],
-            capture_output=True, stdin=subprocess.DEVNULL
+             "--project", self.project_id, "--zone", zone, "--quiet"]
         )
 
     def _start_instance(self, inst):
         cmd = ["gcloud", "compute", "instances", "start", inst["name"], 
                "--project", self.project_id, "--zone", inst["zone"], "--quiet"]
-        res = subprocess.run(cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        res = self._run_cli(cmd)
         return res.returncode == 0
 
     def _create_gpu_instance(self, name, zone):
@@ -241,7 +258,7 @@ class LanaIndustrialEngine:
             "--quiet"
         ]
             
-        res = subprocess.run(cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL)
+        res = self._run_cli(cmd)
         if res.returncode != 0:
             print(f"[ERROR] Failover em {zone}: {res.stderr}")
             return False, res.stderr
@@ -486,8 +503,7 @@ class LanaIndustrialEngine:
             "--format=json(networkInterfaces[0].accessConfigs[0].natIP)",
             "--quiet"
         ]
-        res = subprocess.run(cmd, capture_output=True, text=True,
-                             stdin=subprocess.DEVNULL, encoding="utf-8", errors="ignore")
+        res = self._run_cli(cmd)
         if res.returncode == 0 and res.stdout.strip():
             try:
                 data = json.loads(res.stdout)
@@ -506,8 +522,7 @@ class LanaIndustrialEngine:
             "--format=json(networkInterfaces[0].networkIP)",
             "--quiet"
         ]
-        res = subprocess.run(cmd, capture_output=True, text=True,
-                             stdin=subprocess.DEVNULL, encoding="utf-8", errors="ignore")
+        res = self._run_cli(cmd)
         if res.returncode == 0 and res.stdout.strip():
             try:
                 data = json.loads(res.stdout)
