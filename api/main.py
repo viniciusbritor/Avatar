@@ -116,7 +116,7 @@ def _spawn_gpu():
                      f"--image-family={IMAGE_FAMILY}",
                      f"--image-project={IMAGE_PROJECT}",
                      "--accelerator=count=1,type=nvidia-l4",
-                     "--boot-disk-size=150GB",
+                     "--boot-disk-size=100GB",
                      "--provisioning-model=STANDARD",
                      "--maintenance-policy=TERMINATE",
                      "--metadata-from-file=startup-script=/app/infra/boot/startup_arch4.sh",

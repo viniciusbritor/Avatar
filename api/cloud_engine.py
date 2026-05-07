@@ -45,7 +45,7 @@ class CloudLanaEngine(LanaIndustrialEngine):
             "--image-family=common-cu129-ubuntu-2204-nvidia-580",
             "--image-project=deeplearning-platform-release",
             "--accelerator=count=1,type=nvidia-l4",
-            "--boot-disk-size=150GB",
+            "--boot-disk-size=100GB",
             "--provisioning-model=STANDARD",
             "--maintenance-policy=TERMINATE",
             f"--metadata-from-file=startup-script={startup_script_path}",
