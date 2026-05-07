@@ -38,7 +38,7 @@ JOBS = load_jobs()
 async def create_render_job(payload: dict, background_tasks: BackgroundTasks):
     job_id = str(uuid.uuid4())[:8]
     audio_url = payload.get("audio_url")
-    presenter_id = payload.get("presenter_id", "sarah")
+    presenter_id = payload.get("presenter_id", "lana_comentario")
     
     logging.info(f"[MCP] Recebido Job {job_id} | Audio: {audio_url}")
     

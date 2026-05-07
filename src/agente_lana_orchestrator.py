@@ -679,6 +679,7 @@ class AgenteLanaOrchestrator:
         data = {
             "text": text,
             "model_id": "eleven_multilingual_v2",
+            "language_code": "pt",
             "voice_settings": {"stability": 0.50, "similarity_boost": 0.80, "style": 0.50, "use_speaker_boost": True}
         }
         res = requests.post(url, json=data, headers=headers)

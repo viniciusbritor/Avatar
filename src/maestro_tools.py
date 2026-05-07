@@ -31,11 +31,11 @@ def generate_and_upload_audio(text: str, job_id: str):
         
         # Gera áudio local (usando curl direto para a ElevenLabs para ser leve)
         api_key = get_secret("ELEVEN_LABS_API_KEY")
-        voice_id = "XrExE9yKIg1WjnnlVkGX"
+        voice_id = get_secret("ELEVEN_VOICE_ID") or "XrExE9yKIg1WjnnlVkGX"
         url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
         
         output_path = f"/tmp/{job_id}.mp3"
-        payload = {"text": text, "model_id": "eleven_multilingual_v2"}
+        payload = {"text": text, "model_id": "eleven_multilingual_v2", "language_code": "pt"}
         headers = {"xi-api-key": api_key, "Content-Type": "application/json"}
         
         res = requests.post(url, json=payload, headers=headers)
