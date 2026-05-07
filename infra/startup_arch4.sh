@@ -97,10 +97,11 @@ docker run -d --name lana-engine \
 
 # Auto-recovery: se CUDA falhar (Docker acabou de reiniciar, runtime NVIDIA
 # ainda nao estabilizou), recria o container — igual stop+rm+run manual.
-sleep 8
-if ! docker exec lana-engine python3 -c "import torch; assert torch.cuda.is_available()" 2>/dev/null; then
-    echo "[BOOT] CUDA falhou no primeiro start, recriando container..."
+sleep 15
+if ! docker exec lana-engine python3 -c "import torch; print('CUDA:', torch.cuda.is_available()); assert torch.cuda.is_available()" 2>&1 | tee /tmp/cuda_check.log; then
+    echo "[BOOT] CUDA falhou no primeiro start ($(cat /tmp/cuda_check.log)), recriando container..."
     docker rm -f lana-engine
+    sleep 3
     docker run -d --name lana-engine \
         --gpus all \
         --network host \
@@ -110,6 +111,9 @@ if ! docker exec lana-engine python3 -c "import torch; assert torch.cuda.is_avai
         -v /mnt/weights:/mnt/weights \
         us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden \
         python3 /workspace/src/industrial_main.py
+    echo "[BOOT] Container recriado apos recovery CUDA."
+else
+    echo "[BOOT] CUDA OK no primeiro start."
 fi
 
 # 11. SENTINEL NO HOST (systemd — roda FORA do container)
