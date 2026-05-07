@@ -17,14 +17,14 @@ Avatar/
 │   ├── Dockerfile              # Container imagem API
 │   ├── requirements.txt
 │   ├── main.py                 # FastAPI server (v3.2.2)
-│   ├── secrets_manager.py      # Consulta EXCLUSIVA ao GCP Secret Manager
+│   ├── secrets_manager.py      # Consulta GCP Secret Manager + fallback
 │   └── cloud_engine.py         # Subclasse engine (Linux)
 └── outputs/                    # Saída local
 ```
 
 ### Cofre de Segredos (GCP Secret Manager)
 
-Todas as credenciais são obtidas em runtime via `secrets_manager.py` consultando o GCP Secret Manager (projeto `brasili-ia-news`). **Nunca há fallback para valores hardcoded.**
+Credenciais de APIs externas (ElevenLabs, Gemini) são obtidas em runtime via `secrets_manager.py` consultando o GCP Secret Manager. Tokens internos (ex: `API_SECRET_KEY`) possuem fallback em código.
 
 | Secret | Finalidade |
 |--------|-----------|
