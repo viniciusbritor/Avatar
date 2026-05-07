@@ -92,7 +92,7 @@ docker run -d --name lana-engine \
     -v /workspace:/workspace \
     -v /mnt/weights:/mnt/weights \
     us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden \
-    python3 /workspace/src/industrial_main.py
+    /bin/bash -c "pip install -q google-cloud-secretmanager 2>/dev/null; python3 /workspace/src/industrial_main.py"
 
 # 11. SENTINEL NO HOST (systemd — roda FORA do container)
 #    Se o container morrer → shutdown em MAX_DEAD_CYCLES
