@@ -1,0 +1,49 @@
+diff --git a/latentsync/pipelines/lipsync_pipeline.py b/latentsync/pipelines/lipsync_pipeline.py
+index 693155e..f20b9f2 100644
+--- a/latentsync/pipelines/lipsync_pipeline.py
++++ b/latentsync/pipelines/lipsync_pipeline.py
+@@ -29,6 +29,7 @@ from diffusers.utils import deprecate, logging
+ 
+ from einops import rearrange
+ import cv2
++import kornia
+ 
+ from ..models.unet import UNet3DConditionModel
+ from ..utils.util import read_video, read_audio, write_video, check_ffmpeg_installed
+@@ -235,10 +236,34 @@ class LipsyncPipeline(DiffusionPipeline):
+ 
+     @staticmethod
+     def paste_surrounding_pixels_back(decoded_latents, pixel_values, masks, device, weight_dtype):
+-        # Paste the surrounding pixels back, because we only want to change the mouth region
++        # [V30] Soft mask + color matching fixes mouth contrast/deformity
+         pixel_values = pixel_values.to(device=device, dtype=weight_dtype)
+         masks = masks.to(device=device, dtype=weight_dtype)
+-        combined_pixel_values = decoded_latents * masks + pixel_values * (1 - masks)
++
++        # 1. Soften mask with Gaussian blur to eliminate hard seam at mouth boundary
++        soft_mask = kornia.filters.gaussian_blur2d(masks, (7, 7), (1.8, 1.8))
++
++        # 2. Local color matching: match brightness/contrast of generated mouth to original skin
++        # Skin region (original face pixels, where soft_mask is low)
++        skin_region = (soft_mask < 0.2).float()
++        skin_weight = skin_region.flatten(2).sum(2).clamp(min=1.0)
++        skin_mean = (pixel_values * skin_region).flatten(2).sum(2) / skin_weight
++        skin_var = ((pixel_values - skin_mean.view(-1, 3, 1, 1)).pow(2) * skin_region).flatten(2).sum(2) / skin_weight
++        skin_std = skin_var.clamp(min=1e-6).sqrt()
++
++        # Mouth region (generated pixels, where soft_mask is high)
++        mouth_region = (soft_mask > 0.8).float()
++        mouth_weight = mouth_region.flatten(2).sum(2).clamp(min=1.0)
++        mouth_mean = (decoded_latents * mouth_region).flatten(2).sum(2) / mouth_weight
++        mouth_var = ((decoded_latents - mouth_mean.view(-1, 3, 1, 1)).pow(2) * mouth_region).flatten(2).sum(2) / mouth_weight
++        mouth_std = mouth_var.clamp(min=1e-6).sqrt()
++
++        # Reinhard color transfer: match mean and std
++        ratio = skin_std / mouth_std
++        adjusted = (decoded_latents - mouth_mean.view(-1, 3, 1, 1)) * ratio.view(-1, 3, 1, 1) + skin_mean.view(-1, 3, 1, 1)
++
++        # 3. Final soft blend
++        combined_pixel_values = adjusted * soft_mask + pixel_values * (1 - soft_mask)
+         return combined_pixel_values
+ 
+     @staticmethod
