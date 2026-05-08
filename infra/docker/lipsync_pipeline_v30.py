@@ -236,7 +236,7 @@ class LipsyncPipeline(DiffusionPipeline):
 
     @staticmethod
     def paste_surrounding_pixels_back(decoded_latents, pixel_values, masks, device, weight_dtype):
-        # [V30] Soft mask + color matching fixes mouth contrast/deformity
+        # [V31] V30 soft mask + color matching + GFPGAN photorealism enhancement
         pixel_values = pixel_values.to(device=device, dtype=weight_dtype)
         masks = masks.to(device=device, dtype=weight_dtype)
 
@@ -289,9 +289,13 @@ class LipsyncPipeline(DiffusionPipeline):
         return faces, boxes, affine_matrices
 
     def restore_video(self, faces: torch.Tensor, video_frames: np.ndarray, boxes: list, affine_matrices: list):
+        # [V31] Canonical affine restore + GFPGAN post-processing for photorealism
+        from gfpgan import GFPGANer
         video_frames = video_frames[: len(faces)]
         out_frames = []
-        print(f"Restoring {len(faces)} faces...")
+        print(f"Restoring {len(faces)} faces (V31: affine + GFPGAN)...")
+
+        # 1. Canonical affine restore (same as V30)
         for index, face in enumerate(tqdm.tqdm(faces)):
             x1, y1, x2, y2 = boxes[index]
             height = int(y2 - y1)
@@ -301,7 +305,29 @@ class LipsyncPipeline(DiffusionPipeline):
             )
             out_frame = self.image_processor.restorer.restore_img(video_frames[index], face, affine_matrices[index])
             out_frames.append(out_frame)
-        return np.stack(out_frames, axis=0)
+
+        restored = np.stack(out_frames, axis=0)
+
+        # 2. GFPGAN photorealistic enhancement on restored frames
+        face_enhancer = GFPGANer(
+            model_path='/workspace/latentsync/checkpoints/gfpgan/GFPGANv1.4.pth',
+            upscale=1, arch='clean', channel_multiplier=2, bg_upsampler=None
+        )
+
+        enhanced_frames = []
+        for i, frame_rgb in enumerate(tqdm.tqdm(restored, desc="GFPGAN V31 enhancement")):
+            frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+            _, _, enhanced_bgr = face_enhancer.enhance(
+                frame_bgr, has_aligned=False, only_center_face=False, paste_back=True
+            )
+            if enhanced_bgr is None:
+                enhanced_bgr = frame_bgr
+            enhanced_frames.append(cv2.cvtColor(enhanced_bgr, cv2.COLOR_BGR2RGB))
+
+            if i % 30 == 0:
+                torch.cuda.empty_cache()
+
+        return np.stack(enhanced_frames)
 
     def loop_video(self, whisper_chunks: list, video_frames: np.ndarray):
         # If the audio is longer than the video, we need to loop the video
