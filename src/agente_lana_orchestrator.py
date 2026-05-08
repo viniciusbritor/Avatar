@@ -140,6 +140,9 @@ class LanaIndustrialEngine:
         import uuid
         import requests
         
+        # 0. ZERO-WASTE: Limpar todo resíduo L4 antes de começar
+        self._cleanup_all_l4()
+        
         # 1. Tentar REUSO (Procurar máquinas ociosas)
         existing_instances = self._find_existing_engines()
         for inst in existing_instances:
@@ -178,8 +181,8 @@ class LanaIndustrialEngine:
                 print(f"[WARN] Health check falhou em {existing_name}. Tentando próxima ou Scale-Out.")
             
             # Se chegou aqui, ou ssh falhou ou a máquina está ocupada.
-            # Limpeza apenas se for uma máquina zumbi inalcançável (opcional). 
-            # O ideal é não purgar se estiver apenas ocupada, pois o Sentinel lidará com ela.
+            # Purga zumbi inalcançável, mas não purga se estiver ocupada (Sentinel cuida).
+            self._purge_zone(existing_name, existing_zone)
             self.active_instance = None
             self.active_zone = None
 
@@ -218,6 +221,26 @@ class LanaIndustrialEngine:
                     break # Stockout, pula para próxima zona
 
         raise Exception("CATÁSTROFE: Limite máximo Global de GPUs atingido ou cotas estouradas!")
+
+    def _cleanup_all_l4(self):
+        """Remove TODOS os resíduos de instâncias L4 terminadas (Zero-Waste)."""
+        cmd = [
+            "gcloud", "compute", "instances", "list",
+            "--filter=name~lana-engine- AND status=TERMINATED",
+            "--format=json(name,zone)",
+            "--project", self.project_id, "--quiet"
+        ]
+        res = self._run_cli(cmd)
+        if res.returncode == 0 and res.stdout.strip():
+            try:
+                instances = json.loads(res.stdout)
+                for inst in instances:
+                    zone = inst.get("zone", "").split("/")[-1]
+                    name = inst["name"]
+                    print(f"[ZERO-WASTE] Purgando resíduo L4: {name} em {zone}")
+                    self._purge_zone(name, zone)
+            except Exception as e:
+                print(f"[ZERO-WASTE] Erro ao listar resíduos: {e}")
 
     def _purge_zone(self, name, zone):
         """Purga absoluta de qualquer recurso na região para garantir Zero-Waste."""

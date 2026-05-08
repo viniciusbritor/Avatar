@@ -75,6 +75,33 @@ def health():
     }
 
 
+def _cleanup_l4_residue(project: str):
+    """Remove todas as instâncias L4 terminadas e seus discos (Zero-Waste)."""
+    try:
+        result = subprocess.run(
+            ["gcloud", "compute", "instances", "list",
+             "--filter=name~lana-engine- AND status=TERMINATED",
+             "--format=json(name,zone)",
+             "--project", project, "--quiet", "--verbosity=none"],
+            capture_output=True, text=True, timeout=60
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            import json as _json
+            instances = _json.loads(result.stdout)
+            for inst in instances:
+                zone = inst.get("zone", "").split("/")[-1]
+                name = inst["name"]
+                print(f"[ZERO-WASTE] Purgando resíduo L4: {name} em {zone}")
+                subprocess.run(
+                    ["gcloud", "compute", "instances", "delete", name,
+                     "--project", project, "--zone", zone,
+                     "--delete-disks=all", "--quiet", "--verbosity=none"],
+                    capture_output=True, timeout=60
+                )
+    except Exception as e:
+        print(f"[ZERO-WASTE] Erro na limpeza de resíduos: {e}")
+
+
 def _spawn_gpu():
     """Background: liga ou cria VM L4 com retry 3x. Sem SSH."""
     L4_MACHINE = "g2-standard-12"
@@ -88,6 +115,10 @@ def _spawn_gpu():
 
     import uuid as _uuid
     import time as _time
+    import json as _json
+
+    # 0. ZERO-WASTE: Limpar todo resíduo L4 antes de buscar
+    _cleanup_l4_residue(PROJECT)
 
     for attempt in range(3):
         try:
