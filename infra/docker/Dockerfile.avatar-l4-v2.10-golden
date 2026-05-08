@@ -70,13 +70,11 @@ RUN mkdir -p /workspace/src /workspace/outputs/temp /workspace/latentsync/assets
     && chmod -R 777 /workspace
 
 COPY latentsync/ /workspace/latentsync/
+# [V30] Golden override: soft mask + color matching (fix mouth contrast/deformity)
+COPY infra/docker/lipsync_pipeline_v30.py /workspace/latentsync/latentsync/pipelines/lipsync_pipeline.py
 COPY src/industrial_main.py /workspace/src/industrial_main.py
 COPY src/lipsync_pipeline.py /workspace/src/lipsync_pipeline.py
 COPY src/secrets_manager.py /workspace/src/secrets_manager.py
-
-# [V30] Patch: soft mask + color matching (fix mouth contrast/deformity)
-COPY infra/docker/patch-v30-contrast.patch /tmp/patch-v30-contrast.patch
-RUN patch -p1 -d /workspace/latentsync < /tmp/patch-v30-contrast.patch && rm /tmp/patch-v30-contrast.patch
 
 LABEL project="Lana"
 LABEL tier="Industrial-Golden"
