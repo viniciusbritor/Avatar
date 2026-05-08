@@ -49,6 +49,7 @@ RUN sed -i 's/decord==0.6.0/eva-decord>=0.6.0/' /tmp/latentsync-requirements.txt
     sed -i 's/DeepCache==0.1.1/git+https:\/\/github.com\/horseee\/DeepCache.git/' /tmp/latentsync-requirements.txt && \
     pip3 install --no-cache-dir -r /tmp/latentsync-requirements.txt && \
     pip3 install --no-cache-dir git+https://github.com/XPixelGroup/BasicSR.git@master && \
+    pip3 install --no-cache-dir facexlib==0.3.0 && \
     pip3 install --no-cache-dir gfpgan && \
     pip3 install --no-cache-dir \
     fastapi==0.115.0 \

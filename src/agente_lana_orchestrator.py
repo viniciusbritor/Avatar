@@ -338,6 +338,8 @@ class LanaIndustrialEngine:
                 f"sudo docker rm -f lana-engine 2>/dev/null; "
                 f"sudo gcloud auth configure-docker us-east1-docker.pkg.dev --quiet; "
                 f"sudo docker pull {DOCKER_IMAGE}; "
+                f"sudo rm -rf /workspace/latentsync/checkpoints; "
+                f"sudo ln -sfn /mnt/weights /workspace/latentsync/checkpoints; "
                 f"sudo docker run -d --name lana-engine --gpus all --network host "
                 f"-v /workspace:/workspace -v /mnt/weights:/mnt/weights "
                 f"{DOCKER_IMAGE} tail -f /dev/null",
@@ -451,6 +453,12 @@ class LanaIndustrialEngine:
         _ssh(f"gsutil -m cp {GCS_ASSETS}/*.mp4 /workspace/latentsync/assets/ 2>/dev/null || true && "
              f"rm -rf /workspace/latentsync/checkpoints && "
              f"ln -sfn /mnt/weights /workspace/latentsync/checkpoints", "ASSETS_CHECKPOINTS")
+        # Verifica que o GCS Fuse está funcional (checkpoints acessíveis)
+        verify_res = _ssh("ls /workspace/latentsync/checkpoints/latentsync_unet.pt > /dev/null 2>&1 && "
+                          "echo 'CHECKPOINTS_OK' || echo 'CHECKPOINTS_MISSING'", "VERIFY_CHECKPOINTS")
+        if "CHECKPOINTS_OK" not in verify_res.stdout:
+            raise Exception(f"Checkpoints inacessiveis via GCS Fuse. /mnt/weights pode estar vazio. "
+                            f"Verifique o bucket lana-weights-universal.")
 
         # 3. Pull da imagem Docker
         if not is_prebaked:
