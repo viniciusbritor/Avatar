@@ -75,10 +75,13 @@ if ! timeout 120 docker pull "$IMAGE"; then
     exit 1
 fi
 echo "Pull OK."
-docker image prune -af 2>/dev/null || true
 
 # 5. Iniciar container via systemd (ja instalado)
 systemctl restart lana-api.service
+
+# Prune de imagens velhas apos container subir
+sleep 5
+docker image prune -af 2>/dev/null || true
 
 # 6. Script de update manual (sem cron)
 #    Uso: sudo /usr/local/bin/lana-update.sh
