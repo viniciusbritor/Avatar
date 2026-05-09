@@ -74,6 +74,8 @@ RUN mkdir -p /workspace/src /workspace/outputs/temp /workspace/latentsync/assets
 COPY latentsync/ /workspace/latentsync/
 # [V31] Golden override: V30 contrast fix + GFPGAN photorealism enhancement
 COPY infra/docker/lipsync_pipeline_v30.py /workspace/latentsync/latentsync/pipelines/lipsync_pipeline.py
+# [V32] inference.py override: progress tracking for dashboard
+COPY infra/docker/inference.py /workspace/latentsync/scripts/inference.py
 COPY src/industrial_main.py /workspace/src/industrial_main.py
 COPY src/lipsync_pipeline.py /workspace/src/lipsync_pipeline.py
 COPY src/secrets_manager.py /workspace/src/secrets_manager.py
