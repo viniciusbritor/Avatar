@@ -6,9 +6,10 @@
 #   2. DeepCache==0.1.1 → git+https://github.com/horseee/DeepCache.git
 #
 # Layers:
-#   1. apt (sistema)
-#   2. pip (LatentSync requirements + API server)
-#   3. COPY (código + submodule)
+#   1. apt (sistema + unzip)
+#   2. pip (LatentSync requirements + API server + facexlib + gfpgan)
+#   3. COPY (codigo + submodule)
+#   4. InsightFace buffalo_l models (face detection + landmarks)
 
 FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 
@@ -26,7 +27,7 @@ RUN sed -i 's/archive.ubuntu.com/us-east1.gce.archive.ubuntu.com/' /etc/apt/sour
     python3.10 \
     python3-pip \
     python3.10-dev \
-    git wget curl \
+    git wget curl unzip \
     ffmpeg \
     libsndfile1 \
     libavcodec-dev \
@@ -76,6 +77,18 @@ COPY infra/docker/lipsync_pipeline_v30.py /workspace/latentsync/latentsync/pipel
 COPY src/industrial_main.py /workspace/src/industrial_main.py
 COPY src/lipsync_pipeline.py /workspace/src/lipsync_pipeline.py
 COPY src/secrets_manager.py /workspace/src/secrets_manager.py
+
+# ═══════════════════════════════════════════════════════════════════════════
+# LAYER 4: Modelos InsightFace (buffalo_l — face detection + landmarks)
+#          Baixados no build para nao depender de internet em runtime.
+#          Pos-COPY para garantir que nao sejam sobrescritos.
+# ═══════════════════════════════════════════════════════════════════════════
+RUN mkdir -p /workspace/latentsync/checkpoints/auxiliary/models && \
+    curl -L -o /tmp/buffalo_l.zip \
+      https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip && \
+    unzip -q /tmp/buffalo_l.zip -d /workspace/latentsync/checkpoints/auxiliary/models/ && \
+    rm /tmp/buffalo_l.zip && \
+    echo "InsightFace buffalo_l models installed: $(ls /workspace/latentsync/checkpoints/auxiliary/models/buffalo_l/ | wc -l) files"
 
 LABEL project="Lana"
 LABEL tier="Industrial-Golden"
