@@ -375,6 +375,14 @@ h1 { color: #00ff88; font-size: 18px; margin-bottom: 16px; }
 .summary { display: flex; gap: 16px; margin-top: 8px; }
 .summary-item { font-size: 12px; }
 .summary-item span { font-size: 20px; font-weight: bold; }
+.progress-wrap { margin-top: 8px; background: #1a1a25; border-radius: 4px; height: 20px; overflow: hidden; }
+.progress-bar { height: 100%; border-radius: 4px; transition: width 0.5s ease; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: #000; }
+.progress-loading { background: linear-gradient(90deg, #0066ff, #00aaff); }
+.progress-face_detect { background: linear-gradient(90deg, #00cc88, #00ffaa); }
+.progress-inference { background: linear-gradient(90deg, #8800ff, #cc00ff); }
+.progress-restore { background: linear-gradient(90deg, #ff8800, #ffaa00); }
+.progress-encoding { background: linear-gradient(90deg, #ffcc00, #ffdd44); }
+.progress-done { background: linear-gradient(90deg, #00cc44, #00ff66); }
 .footer { margin-top: 16px; font-size: 10px; color: #444; text-align: center; }
 .refresh { animation: pulse 2s infinite; }
 @keyframes pulse { 0%{opacity:1} 50%{opacity:0.5} 100%{opacity:1} }
@@ -387,6 +395,9 @@ h1 { color: #00ff88; font-size: 18px; margin-bottom: 16px; }
     <h2>GPU L4</h2>
     <div id="gpu-state">Carregando...</div>
     <div id="gpu-info" class="info"></div>
+    <div id="progress-container" style="display:none">
+      <div class="progress-wrap"><div id="progress-bar" class="progress-bar" style="width:0%"></div></div>
+    </div>
   </div>
   <div class="card garbage">
     <h2>🗑️ Lixo Detectado (custo desnecessário)</h2>
@@ -414,6 +425,23 @@ async function refresh() {
     const gpuEl = document.getElementById('gpu-state');
     gpuEl.innerHTML = '<span class="state ' + (g.state||'unknown') + '">' + (g.state||'?').toUpperCase() + '</span>';
     document.getElementById('gpu-info').textContent = (g.instance ? g.instance + ' @ ' + g.zone : '') + ' — ' + (g.message || '');
+    
+    // Progress bar (parse phase/percent from message like "[inference] chunk 3/16 (35%)")
+    const msg = g.message || '';
+    const pctMatch = msg.match(/\((\d+)%\)/);
+    const phaseMatch = msg.match(/\[(\w+)\]/);
+    const progressContainer = document.getElementById('progress-container');
+    const progressBar = document.getElementById('progress-bar');
+    if (pctMatch && phaseMatch && g.state === 'rendering') {
+      const pct = parseInt(pctMatch[1]);
+      const phase = phaseMatch[1];
+      progressContainer.style.display = 'block';
+      progressBar.style.width = pct + '%';
+      progressBar.textContent = pct + '%';
+      progressBar.className = 'progress-bar progress-' + phase;
+    } else if (g.state === 'idle' || g.state === 'ready') {
+      progressContainer.style.display = 'none';
+    }
     
     // Garbage
     const gb = d.garbage || {};
