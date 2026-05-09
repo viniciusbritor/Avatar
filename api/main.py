@@ -28,6 +28,7 @@ try:
     from google.cloud import firestore
     db = firestore.Client(project="brasili-ia-news")
     JOBS_COLLECTION = db.collection('avatar_jobs')
+    GPU_STATUS = db.collection('gpu_status')
 except Exception as e:
     print(f"Firestore indisponivel: {e}")
     db = None
@@ -102,6 +103,22 @@ def _cleanup_l4_residue(project: str):
         print(f"[ZERO-WASTE] Erro na limpeza de resíduos: {e}")
 
 
+def _update_gpu_status(state: str, instance_name: str = "", zone: str = "", message: str = ""):
+    """Escreve estado da GPU no Firestore para dashboard near-real-time."""
+    if not db:
+        return
+    try:
+        GPU_STATUS.document("latest").set({
+            "state": state,
+            "instance": instance_name,
+            "zone": zone,
+            "message": message,
+            "updated_at": datetime.now(BRT).isoformat()
+        })
+    except Exception as e:
+        print(f"[DASHBOARD] Erro ao atualizar GPU status: {e}")
+
+
 def _spawn_gpu():
     """Background: liga ou cria VM L4 com retry 3x. Sem SSH."""
     L4_MACHINE = "g2-standard-12"
@@ -119,6 +136,7 @@ def _spawn_gpu():
 
     # 0. ZERO-WASTE: Limpar todo resíduo L4 antes de buscar
     _cleanup_l4_residue(PROJECT)
+    _update_gpu_status("cleanup", message="Limpando residuos de L4 anteriores")
 
     for attempt in range(3):
         try:
@@ -135,11 +153,14 @@ def _spawn_gpu():
                     inst = sorted(instances, key=lambda x: x['name'], reverse=True)[0]
                     name, zone = inst['name'], inst['zone'].split('/')[-1]
                     print(f"[SPAWN] GPU ja ativa: {name} em {zone}")
+                    _update_gpu_status("ready", instance_name=name, zone=zone, message="GPU L4 ativa e pronta")
                     return
 
             for zone in ZONES:
                 name = f"lana-engine-l4-{int(_time.time())}-{_uuid.uuid4().hex[:4]}"
                 print(f"[SPAWN] Tentativa {attempt+1}/3 — Criando {name} em {zone}...")
+                _update_gpu_status("spawning", instance_name=name, zone=zone,
+                                   message=f"Criando VM L4 em {zone} (tentativa {attempt+1}/3)")
                 res = subprocess.run(
                     ["gcloud", "compute", "instances", "create", name,
                      "--project", PROJECT, "--zone", zone,
@@ -156,6 +177,8 @@ def _spawn_gpu():
                 )
                 if res.returncode == 0:
                     print(f"[SPAWN] GPU criada: {name} em {zone}")
+                    _update_gpu_status("booting", instance_name=name, zone=zone,
+                                       message="VM criada. Boot iniciando (Docker + Sentinel)")
                     return
                 err = (res.stderr or "")[:200]
                 if "Quota" in err or "GPUS_ALL_REGIONS" in err:
@@ -169,6 +192,7 @@ def _spawn_gpu():
         if attempt < 2:
             _time.sleep(30)
     print("[SPAWN] GPU L4 nao encontrada apos 3 tentativas.")
+    _update_gpu_status("failed", message="Falha: GPU L4 nao encontrada apos 3 tentativas")
 
 
 @app.post("/produce")
@@ -232,12 +256,14 @@ async def render_complete_webhook(payload: WebhookRequest, x_api_key: str = Head
             "message": "Video concluido pela GPU.",
             "completed_at": datetime.now(BRT).isoformat()
         })
+        _update_gpu_status("idle", message="Render concluido. GPU aguardando proximo job.")
     else:
         doc_ref.update({
             "status": "failed",
             "message": f"Falha na GPU: {payload.error}",
             "completed_at": datetime.now(BRT).isoformat()
         })
+        _update_gpu_status("error", message=f"Render falhou: {payload.error}")
     return {"status": "ok"}
 
 
@@ -264,3 +290,44 @@ def list_jobs(x_api_key: str = Header(...)):
     docs = JOBS_COLLECTION.order_by("created_at", direction=firestore.Query.DESCENDING).limit(50).stream()
     jobs = [doc.to_dict() for doc in docs]
     return JSONResponse(content={"total": len(jobs), "jobs": jobs})
+
+
+@app.get("/dashboard")
+def dashboard():
+    """Painel near-real-time: GPU status + ultimos jobs. Para Google Stitch."""
+    data = {
+        "timestamp": datetime.now(BRT).isoformat(),
+        "gpu": {"state": "unknown", "instance": "", "zone": "", "message": ""},
+        "last_jobs": [],
+        "summary": {"total_completed": 0, "total_failed": 0, "in_progress": 0}
+    }
+    
+    if not db:
+        data["error"] = "Firestore indisponivel"
+        return JSONResponse(content=data)
+    
+    try:
+        # GPU status
+        gpu_doc = GPU_STATUS.document("latest").get()
+        if gpu_doc.exists:
+            data["gpu"] = gpu_doc.to_dict()
+        
+        # Ultimos 5 jobs
+        job_docs = JOBS_COLLECTION.order_by("created_at", direction=firestore.Query.DESCENDING).limit(5).stream()
+        for doc in job_docs:
+            data["last_jobs"].append(doc.to_dict())
+        
+        # Resumo dos ultimos 20 jobs
+        all_docs = JOBS_COLLECTION.order_by("created_at", direction=firestore.Query.DESCENDING).limit(20).stream()
+        for doc in all_docs:
+            job = doc.to_dict()
+            if job.get("status") == "completed":
+                data["summary"]["total_completed"] += 1
+            elif job.get("status") == "failed" or job.get("status") == "error":
+                data["summary"]["total_failed"] += 1
+            elif job.get("status") in ("queued", "processing"):
+                data["summary"]["in_progress"] += 1
+    except Exception as e:
+        data["error"] = str(e)
+    
+    return JSONResponse(content=data)
