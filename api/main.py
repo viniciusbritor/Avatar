@@ -15,7 +15,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Header, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -117,6 +117,33 @@ def _update_gpu_status(state: str, instance_name: str = "", zone: str = "", mess
         })
     except Exception as e:
         print(f"[DASHBOARD] Erro ao atualizar GPU status: {e}")
+
+
+def _scan_garbage():
+    """Varre instancias L4 TERMINATED e discos orfaos (custo desnecessario)."""
+    garbage = {"instances": [], "disks": [], "total_monthly_cost_usd": 0.0}
+    try:
+        # Instancias L4 TERMINATED
+        res = subprocess.run(
+            ["gcloud", "compute", "instances", "list",
+             "--filter=name~lana-engine- AND status=TERMINATED",
+             "--format=json(name,zone,creationTimestamp)",
+             "--project", "brasili-ia-news", "--quiet", "--verbosity=none"],
+            capture_output=True, text=True, timeout=30
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            import json as _json
+            instances = _json.loads(res.stdout)
+            for inst in instances:
+                zone = inst.get("zone", "").split("/")[-1]
+                garbage["instances"].append({
+                    "name": inst["name"], "zone": zone, "status": "TERMINATED",
+                    "disk_cost": "~$4/mes"
+                })
+        garbage["total_monthly_cost_usd"] = len(garbage["instances"]) * 4.0
+    except Exception as e:
+        garbage["error"] = str(e)
+    return garbage
 
 
 def _spawn_gpu():
@@ -304,13 +331,139 @@ def dashboard():
     
     if not db:
         data["error"] = "Firestore indisponivel"
-        return JSONResponse(content=data)
+    return JSONResponse(content=data)
+
+
+@app.get("/panel", response_class=HTMLResponse, include_in_schema=False)
+def panel():
+    """Painel Lana Industrial — GPU, Jobs, Lixo Zero-Waste."""
+    return HTMLResponse(content="""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="refresh" content="30">
+<title>Lana Industrial — Painel Zero-Waste</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0f; color: #e0e0e0; font-family: 'Courier New', monospace; padding: 20px; }
+h1 { color: #00ff88; font-size: 18px; margin-bottom: 16px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.card { background: #141418; border: 1px solid #2a2a35; border-radius: 6px; padding: 14px; }
+.card h2 { font-size: 13px; color: #888; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 1px; }
+.state { display: inline-block; padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; }
+.cleanup { background: #333; color: #aaa; }
+.spawning { background: #0066ff; color: #fff; }
+.booting { background: #ff8800; color: #fff; }
+.ready { background: #00cc44; color: #000; }
+.rendering { background: #cc00ff; color: #fff; }
+.idle { background: #555; color: #aaa; }
+.error { background: #ff0044; color: #fff; }
+.failed { background: #ff0044; color: #fff; }
+.info { font-size: 11px; color: #666; margin-top: 4px; }
+.garbage { border-color: #ff4444; background: #1a1014; }
+.garbage h2 { color: #ff4444; }
+.garbage-item { font-size: 11px; color: #ff6666; padding: 2px 0; }
+.cost { color: #ffaa00; font-weight: bold; }
+.job { font-size: 11px; padding: 4px 0; border-bottom: 1px solid #1a1a22; }
+.job-id { color: #00aaff; }
+.job-status { font-weight: bold; }
+.completed { color: #00cc44; }
+.queued { color: #ffaa00; }
+.failed { color: #ff4444; }
+.processing { color: #cc00ff; }
+.summary { display: flex; gap: 16px; margin-top: 8px; }
+.summary-item { font-size: 12px; }
+.summary-item span { font-size: 20px; font-weight: bold; }
+.footer { margin-top: 16px; font-size: 10px; color: #444; text-align: center; }
+.refresh { animation: pulse 2s infinite; }
+@keyframes pulse { 0%{opacity:1} 50%{opacity:0.5} 100%{opacity:1} }
+</style>
+</head>
+<body>
+<h1>⚡ Lana Industrial — Painel Zero-Waste</h1>
+<div class="grid">
+  <div class="card">
+    <h2>GPU L4</h2>
+    <div id="gpu-state">Carregando...</div>
+    <div id="gpu-info" class="info"></div>
+  </div>
+  <div class="card garbage">
+    <h2>🗑️ Lixo Detectado (custo desnecessário)</h2>
+    <div id="garbage">Carregando...</div>
+  </div>
+  <div class="card">
+    <h2>Resumo (últimos 20 jobs)</h2>
+    <div id="summary"></div>
+  </div>
+  <div class="card">
+    <h2>Últimos Jobs</h2>
+    <div id="jobs"></div>
+  </div>
+</div>
+<div class="footer"><span class="refresh" id="clock"></span> — polling a cada 5s</div>
+<script>
+async function refresh() {
+  try {
+    const r = await fetch('/dashboard');
+    const d = await r.json();
+    document.getElementById('clock').textContent = d.timestamp || '';
+    
+    // GPU
+    const g = d.gpu;
+    const gpuEl = document.getElementById('gpu-state');
+    gpuEl.innerHTML = '<span class="state ' + (g.state||'unknown') + '">' + (g.state||'?').toUpperCase() + '</span>';
+    document.getElementById('gpu-info').textContent = (g.instance ? g.instance + ' @ ' + g.zone : '') + ' — ' + (g.message || '');
+    
+    // Garbage
+    const gb = d.garbage || {};
+    let gbHtml = '';
+    if (gb.instances && gb.instances.length > 0) {
+      gbHtml += '<div class="cost">Custo mensal estimado: ~$' + gb.total_monthly_cost_usd + '/mês</div>';
+      gb.instances.forEach(i => {
+        gbHtml += '<div class="garbage-item">⚠️ ' + i.name + ' @ ' + i.zone + ' (' + i.status + ') — ' + i.disk_cost + '</div>';
+      });
+    } else {
+      gbHtml = '<div style="color:#00cc44;font-size:12px;">✅ Nenhum lixo detectado</div>';
+    }
+    document.getElementById('garbage').innerHTML = gbHtml;
+    
+    // Summary
+    const s = d.summary;
+    document.getElementById('summary').innerHTML = `
+      <div class="summary-item">✅ Concluídos: <span style="color:#00cc44">${s.total_completed}</span></div>
+      <div class="summary-item">❌ Falhas: <span style="color:#ff4444">${s.total_failed}</span></div>
+      <div class="summary-item">⏳ Em andamento: <span style="color:#ffaa00">${s.in_progress}</span></div>
+    `;
+    
+    // Jobs
+    let jHtml = '';
+    (d.last_jobs || []).forEach(j => {
+      jHtml += '<div class="job"><span class="job-id">#' + (j.job_id||'?').substring(0,8) + '</span> ';
+      jHtml += '<span class="job-status ' + (j.status||'') + '">' + (j.status||'?') + '</span> ';
+      jHtml += '<span style="color:#666;font-size:10px">' + (j.text||'').substring(0,40) + '</span>';
+      if (j.video_path) jHtml += ' 📹';
+      jHtml += '</div>';
+    });
+    document.getElementById('jobs').innerHTML = jHtml || 'Nenhum job';
+  } catch(e) {
+    console.error(e);
+  }
+}
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>""")
     
     try:
         # GPU status
         gpu_doc = GPU_STATUS.document("latest").get()
         if gpu_doc.exists:
             data["gpu"] = gpu_doc.to_dict()
+        
+        # Lixo (instancias TERMINATED)
+        data["garbage"] = _scan_garbage()
         
         # Ultimos 5 jobs
         job_docs = JOBS_COLLECTION.order_by("created_at", direction=firestore.Query.DESCENDING).limit(5).stream()
