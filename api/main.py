@@ -19,8 +19,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from google.cloud import compute_v1
-from google.cloud.compute_v1 import (
-    Instance, AttachedDisk, InitializeParams,
+from google.cloud.compute_v1.types import (
+    Instance, AttachedDisk, AttachedDiskInitializeParams,
     AcceleratorConfig, NetworkInterface, AccessConfig,
     ServiceAccount, Metadata, Items, Scheduling,
     ListInstancesRequest
@@ -214,7 +214,7 @@ def _spawn_gpu():
                         disks=[AttachedDisk(
                             boot=True,
                             auto_delete=True,
-                            initialize_params=InitializeParams(
+                            initialize_params=AttachedDiskInitializeParams(
                                 disk_size_gb=100,
                                 source_image=f"projects/{IMAGE_PROJECT}/global/images/family/{IMAGE_FAMILY}"
                             )
