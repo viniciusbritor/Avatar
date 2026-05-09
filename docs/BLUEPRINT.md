@@ -3,7 +3,7 @@
 Este documento define a arquitetura final, agnóstico de região e autossuficiente para a produção de avatares IA.
 
 ## 1. Arquitetura de Infraestrutura (GCP)
-- **API**: VM `e2-micro` com IP fixo (`35.231.46.76`) em `us-east1-b`.
+- **API**: VM `e2-micro` com disco **30 GB pd-standard** e IP fixo (`35.231.46.76`) em `us-east1-c`. Deploy manual (sem cron). Boot puxa imagem do Artifact Registry.
 - **GPU**: `g2-standard-12` (48GB RAM, NVIDIA L4 24GB VRAM).
 - **Região Primária**: `us-east1` (fallback: 13 zonas globais).
 - **Modelo de Custo**: **On-Demand Sovereignty** (Disponibilidade garantida sem dependência de leilão).

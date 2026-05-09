@@ -1,5 +1,5 @@
 # Brasil AI — Avatar API
-## Guia de Deploy (VM e2-micro IP fixo — v3.2.2)
+## Guia de Deploy (VM e2-micro IP fixo — v4.3)
 
 ### Estrutura
 
@@ -39,22 +39,24 @@ Credenciais de APIs externas (ElevenLabs, Gemini) são obtidas em runtime via `s
 
 ---
 
-### 1. Deploy (Cloud Build → Artifact Registry → VM cron auto-update)
+### 1. Deploy (Cloud Build → Artifact Registry → Update Manual)
 
-O deploy exige **dois passos manuais** (GitHub Actions NÃO trigga Cloud Build automaticamente):
+O CI/CD faz build + push automaticamente. O deploy na VM é sempre manual.
 
 ```bash
-# 1. Commit e push no GitHub
+# 1. Commit e push no GitHub → CI/CD trigga Cloud Build
 git add -A && git commit -m "..." && git push origin master
 
-# 2. Disparar Cloud Build MANUALMENTE para gerar a imagem e fazer push para Artifact Registry
-gcloud builds submit --project brasili-ia-news --config cloudbuild-api.yaml .
+# 2. GitHub Actions → gcloud builds submit → imagem no Artifact Registry
 
-# 3. A VM lana-api (35.231.46.76) puxa a nova imagem via cron a cada 5 min
-#    Script: /usr/local/bin/lana-auto-update.sh
+# 3. Atualizar a VM manualmente via SSH
+gcloud compute ssh lana-api --zone=us-east1-c --tunnel-through-iap
+sudo lana-update.sh
 ```
 
-A VM está em **us-east1-c** (pode migrar para `us-east1-b` ou `us-east1-d` se houver `ZONE_RESOURCE_POOL_EXHAUSTED`), roda **e2-micro** com IP fixo regional `35.231.46.76`. Base image: **`ubuntu-2204-lts`** (`ubuntu-os-cloud`) — obrigatório para `apt-get`. O container usa `--restart unless-stopped` — sobrevive a restart da VM.
+O script `lana-update.sh` puxa a imagem do Artifact Registry (fonte única, sem cache local), faz prune de imagens velhas, reinicia o container, e verifica o `/health`. Se o pull falhar, o container atual continua rodando.
+
+A VM está em **us-east1-c**, roda **e2-micro** com disco **30 GB pd-standard** e IP fixo regional `35.231.46.76`. Base image: **`ubuntu-2204-lts`** (`ubuntu-os-cloud`). Deploy manual via `sudo lana-update.sh` (sem cron). O container usa `--restart unless-stopped` e `--pull always` — sempre puxa do Artifact Registry.
 
 ### 2. Uso da API
 

@@ -1,7 +1,7 @@
-# Especificacoes Tecnicas Operacionais — Avatar v3.2.1 (PRODUCAO)
+# Especificacoes Tecnicas Operacionais — Avatar v4.3 (PRODUCAO)
 
 ## 1. API (Cerebro)
-- **Host:** VM e2-micro `lana-api` (us-east1-b)
+- **Host:** VM e2-micro `lana-api` (us-east1-c)
 - **IP Fixo:** `35.231.46.76`
 - **Endpoints:**
     - `POST /produce`: Enfileira producao (TTS + Firestore + spawn GPU) — ~5s
@@ -54,7 +54,8 @@
 ## 7. Custos
 | Recurso | Custo |
 |---|---|
-| VM e2-micro (24/7) | ~$6/mes |
+| VM e2-micro (24/7) | ~$12/mes |
+| Disco 30 GB pd-standard | ~$1.20/mes |
 | IP estatico | ~$3/mes |
 | GPU L4 (sob demanda) | ~$0.70/h |
 
@@ -64,7 +65,7 @@
 
 | Gatilho (paths) | Workflow | O que faz |
 |---|---|---|
-| `api/**`, `src/**`, `infra/**` | `ci-cd-api.yml` | Build + push `avatar-api:latest` → trigger GCS → VM puxa |
+| `api/**`, `src/**`, `infra/**` | `ci-cd-api.yml` | Build + push `avatar-api:latest` → deploy manual via `sudo lana-update.sh` |
 | `latentsync/**`, `infra/docker/Dockerfile.avatar-l4-v2.10-golden`, `src/**` | `ci-cd-l4.yml` | Build + push `avatar-l4:v2.10-golden` |
 
 | YAML | Proposito |
@@ -72,15 +73,22 @@
 | `cloudbuild-api.yaml` | Cloud Build: API image |
 | `cloudbuild-l4-golden.yaml` | Cloud Build: L4 golden image (gsutil pre-step + docker build) |
 
-**Auto-cleanup:** `docker system prune -af` roda antes de cada pull na VM e2-micro (previne disco cheio).
+**Auto-cleanup:** `docker image prune -af` roda após cada pull bem-sucedido na VM (previne disco cheio).
+
+## 8.1 Verificação (3 camadas)
+| Camada | Método | Frequência |
+|---|---|---|
+| Uptime Check GCP | curl `http://35.231.46.76:8080/health` | a cada 5 min |
+| CI/CD (GitHub Actions) | curl health no final do build | a cada push |
+| lana-update.sh | curl localhost:8080/health após restart | manual |
 
 ## 9. Branches
 | Branch | Status |
 |---|---|
-| `master` | **Producao v3.2.1** |
+| `master` | **Producao v4.3** |
 | `sincronia` | Testes A-D |
 | `linear-projection` | Merged → master |
 | `checkpoint-768` | Experimental |
 
 ---
-*Status: v3.2.1 PRODUCAO — small.pt + projecao 768→384 + guidance 2.5 + Matilda + GFPGAN.*
+*Status: v4.3 PRODUCAO — disco 30GB + deploy manual + uptime check + small.pt + projecao 768→384 + guidance 2.5 + Matilda + GFPGAN.*

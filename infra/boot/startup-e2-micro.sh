@@ -1,13 +1,14 @@
 #!/bin/bash
-# Lana API Startup — VM e2-micro (v4.1 — systemd + trigger GCS)
-#   - Systemd unit lana-api.service (sobrevive a restart de VM e crash)
-#   - Trigger-based update: verifica GCS a cada 1min. Só faz docker pull
-#     quando o CI/CD escreve um trigger apos Cloud Build bem-sucedido.
-#   - Idempotente: roda seguro no boot e manualmente
+# Lana API Startup — VM e2-micro (v4.3 — fonte unica no Artifact Registry)
+#   - Sem cron. Sem cache local. Sempre puxa do Artifact Registry.
+#   - Boot: pull da ultima imagem. Se falhar → aborta. Sem fallback.
+#   - Update: manual via "sudo lana-update.sh".
 set -x
 exec > /var/log/lana-startup.log 2>&1
 
 echo "=== LANA API BOOT $(date) ==="
+
+IMAGE="us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest"
 
 # 1. Docker
 if ! command -v docker &> /dev/null; then
@@ -22,30 +23,40 @@ for i in $(seq 1 10); do
     sleep 6
 done
 
-# 3. Pull com retry
-for i in $(seq 1 5); do
-    echo "PULL attempt $i..."
-    docker pull us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest && break
-    sleep 10
-done
+# 3. Pull do Artifact Registry (fonte unica).
+#    Se falhar → aborta boot. Nao usa imagem velha de disco.
+echo "Pulling $IMAGE..."
+if ! timeout 300 docker pull "$IMAGE"; then
+    echo "FATAL: Pull falhou no boot!"
+    echo "O container NAO sera iniciado."
+    echo "Execute 'sudo lana-update.sh' manualmente apos resolver."
+    exit 1
+fi
+echo "Pull OK."
+docker image prune -af 2>/dev/null || true
 
-# 4. Instalar systemd unit (idempotente)
+# 4. Instalar systemd unit (idempotente — sem cron)
 cat > /etc/systemd/system/lana-api.service << 'UNITEOF'
 [Unit]
-Description=Brasil AI — Avatar API (v3.2.2)
+Description=Brasil AI — Avatar API (v3.2.4)
 After=network.target docker.service
 Requires=docker.service
 
 [Service]
-Type=simple
+Type=exec
 ExecStartPre=-/usr/bin/docker rm -f lana-api
-ExecStart=/usr/bin/docker run --name lana-api \
-    --restart=no \
+ExecStart=/usr/bin/docker run --pull always \
+    --name lana-api \
+    --restart unless-stopped \
     --network host \
     us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest
-ExecStop=/usr/bin/docker stop lana-api
-Restart=always
-RestartSec=5
+ExecStop=/usr/bin/docker stop -t 10 lana-api
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=60
+TimeoutStopSec=15
+StartLimitIntervalSec=60
+StartLimitBurst=3
 
 [Install]
 WantedBy=multi-user.target
@@ -54,32 +65,43 @@ systemctl daemon-reload
 systemctl enable lana-api.service
 systemctl restart lana-api.service
 
-# 5. Trigger-based update (CI/CD escreve trigger no GCS apos build)
-#    Detecta imagem nova, faz pull, limpa imagens velhas e reinicia.
-#    NAO reexecuta o startup script — ele e so para boot da VM.
-#    Mudancas de host (systemd, cron) exigem reboot ou SSH manual.
-cat > /usr/local/bin/lana-trigger-update.sh << 'TRIGEOF'
+# 5. Script de update manual (sem cron)
+#    Uso: sudo /usr/local/bin/lana-update.sh
+#    Puxa do Artifact Registry.
+#    Se falhar → mantem container atual rodando (fallback seguro).
+cat > /usr/local/bin/lana-update.sh << 'UPDATEEOF'
 #!/bin/bash
-TRIGGER="gs://brasil-ai-avatars-vault/triggers/lana-api-update.txt"
-STATE_FILE="/var/lib/lana-api/last-trigger-ts"
+set -e
 IMAGE="us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest"
-mkdir -p /var/lib/lana-api
 
-REMOTE_TS=$(gsutil cp "$TRIGGER" - 2>/dev/null | head -1 | tr -d '\n\r ')
-[ -z "$REMOTE_TS" ] && exit 0
+echo "=== LANA UPDATE $(date) ==="
+echo "Pulling $IMAGE ..."
 
-LOCAL_TS=$(cat "$STATE_FILE" 2>/dev/null)
-if [ "$REMOTE_TS" != "$LOCAL_TS" ]; then
-    echo "[TRIGGER-UPDATE] $(date): new trigger detected."
-    # ZERO-WASTE: limpar imagens/containers velhos antes de puxar
-    docker system prune -af 2>/dev/null || true
-    docker pull "$IMAGE"
-    docker image prune -f
-    systemctl restart lana-api.service
-    echo "$REMOTE_TS" > "$STATE_FILE"
+if ! timeout 300 docker pull "$IMAGE"; then
+    echo "FATAL: Pull da nova imagem falhou!"
+    echo "Mantendo container atual rodando."
+    echo "Verifique o Artifact Registry — imagem pode estar corrompida."
+    exit 1
 fi
-TRIGEOF
-chmod +x /usr/local/bin/lana-trigger-update.sh
-(crontab -l 2>/dev/null; echo "* * * * * /usr/local/bin/lana-trigger-update.sh") | crontab -
+
+echo "Pull OK. Restarting container..."
+docker image prune -af 2>/dev/null || true
+systemctl restart lana-api.service
+
+# Verificar se a API subiu saudavel
+echo "Verifying /health..."
+sleep 10
+if curl -sf --max-time 5 http://localhost:8080/health > /dev/null 2>&1; then
+    echo "VERIFIED: API healthy on :8080"
+else
+    echo "WARNING: API nao respondeu no /health apos restart!"
+    echo "Verifique os logs: sudo journalctl -u lana-api.service -f"
+fi
+echo "=== UPDATE DONE ==="
+UPDATEEOF
+chmod +x /usr/local/bin/lana-update.sh
+
+# 6. Garantir que nao ha cron de polling
+crontab -r 2>/dev/null || true
 
 echo "=== BOOT COMPLETE ==="

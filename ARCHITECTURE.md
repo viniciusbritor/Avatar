@@ -1,4 +1,4 @@
-# Arquitetura Industrial Avatar (v3.2.2) — "Cérebro & Motor"
+# Arquitetura Industrial Avatar (v4.3) — "Cérebro & Motor"
 
 Este documento é a especificação soberana do ecossistema Brasil AI Avatar. Toda e qualquer modificação no código deve respeitar os pilares de **Zero-Waste**, **Cloud-Native** e **Blindagem de Segurança** aqui descritos.
 
@@ -16,12 +16,13 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 
 ### 2.1 API Cérebro (VM e2-micro — IP fixo)
 - **Tecnologia:** Python 3.11, FastAPI.
-- **Host:** VM e2-micro (`lana-api`) em `us-east1-c`. IP fixo: `35.231.46.76` (regional `us-east1`, movível entre zonas `b`/`c`/`d`).
+- **Host:** VM e2-micro (`lana-api`) em `us-east1-c`. Disco: 30 GB pd-standard (~$1.20/mês). IP fixo: `35.231.46.76` (regional `us-east1`, movível entre zonas `b`/`c`/`d`).
 - **Base Image:** `ubuntu-2204-lts` (Ubuntu 22.04 LTS, `ubuntu-os-cloud`). Obrigatório — o startup script depende de `apt-get`. NUNCA use `cos-stable` (Container-Optimized OS).
 - **Orquestrador:** Agente Lana (Maestro via Agno/Phidata).
 - **Segurança:** Autenticação via `X-API-Key` (token interno simples entre VMs na mesma VPC).
 - **Missão:** Receber requisições, gerar áudio (ElevenLabs), enfileirar job no Firestore, e disparar GPU L4 sob demanda.
-- **Deploy:** Cloud Build gera imagem → Artifact Registry → VM puxa via cron a cada 5 min (`infra/boot/startup-e2-micro.sh`).
+- **Deploy:** Cloud Build gera imagem → Artifact Registry. Deploy manual via `sudo /usr/local/bin/lana-update.sh` na VM. Imagem sempre puxada do Artifact Registry (fonte única, sem cache local). Nenhum cron.
+- **Verificação (3 camadas):** (1) Uptime Check GCP em `http://35.231.46.76:8080/health` a cada 5min. (2) CI/CD faz curl health após build. (3) `lana-update.sh` faz curl health após restart.
 
 ### 2.2 Cofre de Segredos (GCP Secret Manager — Free Tier)
 - **Source of Truth único** para todas as credenciais do ecossistema.
@@ -96,4 +97,4 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 
 ---
 
-*Documento atualizado em 2026-05-06 por Antigravity (v3.2.2).*
+*Documento atualizado em 2026-05-09 por Antigravity (v4.3).*
