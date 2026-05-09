@@ -1,5 +1,5 @@
 #!/bin/bash
-# Lana API Startup — VM e2-micro (v4.3 — fonte unica no Artifact Registry)
+# Lana API Startup — VM e2-micro (v4.4 — token direto, sem credential helper)
 #   - Sem cron. Sem cache local. Sempre puxa do Artifact Registry.
 #   - Boot: pull da ultima imagem. Se falhar → aborta. Sem fallback.
 #   - Update: manual via "sudo lana-update.sh".
@@ -17,25 +17,26 @@ if ! command -v docker &> /dev/null; then
     systemctl enable docker
 fi
 
-# 2. Auth Artifact Registry — com retry
+# 2. Auth Artifact Registry — token direto (sem credential helper)
+#    Credential helper (docker-credential-gcloud) trava quando metadata server lento.
+#    Token direto evita travar.
+AUTH_OK=0
 for i in $(seq 1 10); do
-    gcloud auth configure-docker us-east1-docker.pkg.dev --quiet && break
+    if gcloud auth print-access-token | docker login -u oauth2accesstoken \
+        --password-stdin us-east1-docker.pkg.dev 2>/dev/null; then
+        AUTH_OK=1; break
+    fi
     sleep 6
 done
-
-# 3. Pull do Artifact Registry (fonte unica).
-#    Se falhar → aborta boot. Nao usa imagem velha de disco.
-echo "Pulling $IMAGE..."
-if ! timeout 300 docker pull "$IMAGE"; then
-    echo "FATAL: Pull falhou no boot!"
-    echo "O container NAO sera iniciado."
-    echo "Execute 'sudo lana-update.sh' manualmente apos resolver."
-    exit 1
+if [ "$AUTH_OK" = "0" ]; then
+    echo "FATAL: Auth Artifact Registry falhou apos 10 tentativas."
+    echo "Token direto como fallback..."
+    gcloud auth print-access-token | docker login -u oauth2accesstoken \
+        --password-stdin us-east1-docker.pkg.dev || { echo "Auth falhou. Abortando."; exit 1; }
 fi
-echo "Pull OK."
-docker image prune -af 2>/dev/null || true
 
-# 4. Instalar systemd unit (idempotente — sem cron)
+# 3. Instalar systemd unit ANTES do pull (idempotente)
+#    Se o pull falhar, o unit ja existe. lana-update.sh consegue restart.
 cat > /etc/systemd/system/lana-api.service << 'UNITEOF'
 [Unit]
 Description=Brasil AI — Avatar API (v3.2.4)
@@ -53,7 +54,7 @@ ExecStart=/usr/bin/docker run --pull always \
 ExecStop=/usr/bin/docker stop -t 10 lana-api
 Restart=on-failure
 RestartSec=10
-TimeoutStartSec=60
+TimeoutStartSec=90
 TimeoutStopSec=15
 StartLimitIntervalSec=60
 StartLimitBurst=3
@@ -63,9 +64,23 @@ WantedBy=multi-user.target
 UNITEOF
 systemctl daemon-reload
 systemctl enable lana-api.service
+
+# 4. Pull do Artifact Registry (fonte unica).
+#    Se falhar → aborta boot (mas systemd unit ja instalado).
+echo "Pulling $IMAGE..."
+if ! timeout 120 docker pull "$IMAGE"; then
+    echo "FATAL: Pull falhou no boot!"
+    echo "O container NAO sera iniciado."
+    echo "Execute 'sudo lana-update.sh' manualmente apos resolver."
+    exit 1
+fi
+echo "Pull OK."
+docker image prune -af 2>/dev/null || true
+
+# 5. Iniciar container via systemd (ja instalado)
 systemctl restart lana-api.service
 
-# 5. Script de update manual (sem cron)
+# 6. Script de update manual (sem cron)
 #    Uso: sudo /usr/local/bin/lana-update.sh
 #    Puxa do Artifact Registry.
 #    Se falhar → mantem container atual rodando (fallback seguro).
@@ -77,7 +92,7 @@ IMAGE="us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest"
 echo "=== LANA UPDATE $(date) ==="
 echo "Pulling $IMAGE ..."
 
-if ! timeout 300 docker pull "$IMAGE"; then
+if ! timeout 120 docker pull "$IMAGE"; then
     echo "FATAL: Pull da nova imagem falhou!"
     echo "Mantendo container atual rodando."
     echo "Verifique o Artifact Registry — imagem pode estar corrompida."
@@ -101,7 +116,7 @@ echo "=== UPDATE DONE ==="
 UPDATEEOF
 chmod +x /usr/local/bin/lana-update.sh
 
-# 6. Garantir que nao ha cron de polling
+# 7. Garantir que nao ha cron de polling
 crontab -r 2>/dev/null || true
 
 echo "=== BOOT COMPLETE ==="

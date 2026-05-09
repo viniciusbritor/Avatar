@@ -1,21 +1,16 @@
-# Brasil AI Avatar API — Dependências (VM e2-micro IP fixo)
+# Brasil AI Avatar API — Dependências (VM e2-micro, v4.5 — Python SDK nativo)
+# Sem gcloud CLI. Apenas o que o orquestrador realmente usa.
 
 # ── Servidor Web ──────────────────────────────────────────────────────────────
 fastapi==0.115.0
 uvicorn[standard]==0.31.0
 pydantic==2.7.4
 
-# ── Inteligência Artificial (Bypass OpenAI) ───────────────────────────────────
-openai
-agno==1.5.2
-google-genai==0.2.0
-
-# ── GCP Infrastructure ────────────────────────────────────────────────────────
+# ── GCP Infrastructure (Python SDK nativo, sem gcloud CLI) ────────────────────
 requests==2.32.3
 google-cloud-storage==2.18.2
 google-cloud-secret-manager==2.20.2
 google-cloud-compute==1.15.0
-google-cloud-tasks==2.14.2
 google-cloud-firestore==2.18.0
 python-dotenv==1.0.1
 protobuf==4.25.3

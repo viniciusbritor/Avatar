@@ -9,7 +9,6 @@ Fluxo:
 
 import os
 import uuid
-import subprocess
 import threading
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -19,10 +18,26 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from google.cloud import compute_v1
+from google.cloud.compute_v1 import (
+    Instance, AttachedDisk, InitializeParams,
+    AcceleratorConfig, NetworkInterface, AccessConfig,
+    ServiceAccount, Metadata, Items, Scheduling,
+    ListInstancesRequest
+)
+from google.api_core import exceptions as gcp_exceptions
+
 from src.agente_lana_orchestrator import AgenteLanaOrchestrator
 from .secrets_manager import get_secret
 
 BRT = timezone(timedelta(hours=-3))
+
+ZONES = ["us-east1-c", "us-west4-a", "us-east1-d", "us-east4-a", "us-west1-a",
+         "us-central1-a", "us-east5-a", "us-south1-a", "europe-west4-a",
+         "europe-west1-b", "europe-west6-b", "asia-east1-a",
+         "northamerica-northeast1-b"]
+
+PROJECT = "brasili-ia-news"
 
 try:
     from google.cloud import firestore
@@ -79,26 +94,21 @@ def health():
 def _cleanup_l4_residue(project: str):
     """Remove todas as instâncias L4 terminadas e seus discos (Zero-Waste)."""
     try:
-        result = subprocess.run(
-            ["gcloud", "compute", "instances", "list",
-             "--filter=name~lana-engine- AND status=TERMINATED",
-             "--format=json(name,zone)",
-             "--project", project, "--quiet", "--verbosity=none"],
-            capture_output=True, text=True, timeout=60
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            import json as _json
-            instances = _json.loads(result.stdout)
-            for inst in instances:
-                zone = inst.get("zone", "").split("/")[-1]
-                name = inst["name"]
-                print(f"[ZERO-WASTE] Purgando resíduo L4: {name} em {zone}")
-                subprocess.run(
-                    ["gcloud", "compute", "instances", "delete", name,
-                     "--project", project, "--zone", zone,
-                     "--delete-disks=all", "--quiet", "--verbosity=none"],
-                    capture_output=True, timeout=60
+        client = compute_v1.InstancesClient()
+        for zone in ZONES:
+            try:
+                request = ListInstancesRequest(
+                    project=project, zone=zone,
+                    filter='name ~ "lana-engine-" AND status = "TERMINATED"'
                 )
+                for instance in client.list(request=request):
+                    name = instance.name
+                    print(f"[ZERO-WASTE] Purgando resíduo L4: {name} em {zone}")
+                    client.delete(project=project, zone=zone, instance=name)
+            except gcp_exceptions.NotFound:
+                pass
+            except gcp_exceptions.GoogleAPICallError as e:
+                print(f"[ZERO-WASTE] Erro em {zone}: {e}")
     except Exception as e:
         print(f"[ZERO-WASTE] Erro na limpeza de resíduos: {e}")
 
@@ -123,23 +133,22 @@ def _scan_garbage():
     """Varre instancias L4 TERMINATED e discos orfaos (custo desnecessario)."""
     garbage = {"instances": [], "disks": [], "total_monthly_cost_usd": 0.0}
     try:
-        # Instancias L4 TERMINATED
-        res = subprocess.run(
-            ["gcloud", "compute", "instances", "list",
-             "--filter=name~lana-engine- AND status=TERMINATED",
-             "--format=json(name,zone,creationTimestamp)",
-             "--project", "brasili-ia-news", "--quiet", "--verbosity=none"],
-            capture_output=True, text=True, timeout=30
-        )
-        if res.returncode == 0 and res.stdout.strip():
-            import json as _json
-            instances = _json.loads(res.stdout)
-            for inst in instances:
-                zone = inst.get("zone", "").split("/")[-1]
-                garbage["instances"].append({
-                    "name": inst["name"], "zone": zone, "status": "TERMINATED",
-                    "disk_cost": "~$4/mes"
-                })
+        client = compute_v1.InstancesClient()
+        for zone in ZONES:
+            try:
+                request = ListInstancesRequest(
+                    project=PROJECT, zone=zone,
+                    filter='name ~ "lana-engine-" AND status = "TERMINATED"'
+                )
+                for instance in client.list(request=request):
+                    garbage["instances"].append({
+                        "name": instance.name, "zone": zone, "status": "TERMINATED",
+                        "disk_cost": "~$4/mes"
+                    })
+            except gcp_exceptions.NotFound:
+                pass
+            except gcp_exceptions.GoogleAPICallError as e:
+                print(f"[SCAN] Erro em {zone}: {e}")
         garbage["total_monthly_cost_usd"] = len(garbage["instances"]) * 4.0
     except Exception as e:
         garbage["error"] = str(e)
@@ -151,69 +160,100 @@ def _spawn_gpu():
     L4_MACHINE = "g2-standard-12"
     IMAGE_FAMILY = "common-cu129-ubuntu-2204-nvidia-580"
     IMAGE_PROJECT = "deeplearning-platform-release"
-    ZONES = ["us-east1-c", "us-west4-a", "us-east1-d", "us-east4-a", "us-west1-a",
-             "us-central1-a", "us-east5-a", "us-south1-a", "europe-west4-a",
-             "europe-west1-b", "europe-west6-b", "asia-east1-a",
-             "northamerica-northeast1-b"]
-    PROJECT = "brasili-ia-news"
 
     import uuid as _uuid
     import time as _time
-    import json as _json
 
-    # 0. ZERO-WASTE: Limpar todo resíduo L4 antes de buscar
     _cleanup_l4_residue(PROJECT)
     _update_gpu_status("cleanup", message="Limpando residuos de L4 anteriores")
 
+    # Carrega startup-script do disco do container
+    try:
+        with open("/app/infra/boot/startup_arch4.sh", "r") as f:
+            STARTUP_SCRIPT = f.read()
+    except Exception:
+        STARTUP_SCRIPT = "#!/bin/bash\necho 'startup_arch4.sh nao encontrado'"
+
+    client = compute_v1.InstancesClient()
+
     for attempt in range(3):
         try:
-            existing = subprocess.run(
-                ["gcloud", "compute", "instances", "list",
-                 "--filter=name~lana-engine- AND status=RUNNING",
-                 "--format=json", "--project", PROJECT, "--quiet", "--verbosity=none"],
-                capture_output=True, text=True, timeout=90
-            )
-            if existing.returncode == 0 and existing.stdout.strip():
-                import json as _json
-                instances = _json.loads(existing.stdout)
-                if instances:
-                    inst = sorted(instances, key=lambda x: x['name'], reverse=True)[0]
-                    name, zone = inst['name'], inst['zone'].split('/')[-1]
-                    print(f"[SPAWN] GPU ja ativa: {name} em {zone}")
-                    _update_gpu_status("ready", instance_name=name, zone=zone, message="GPU L4 ativa e pronta")
-                    return
+            # Reusa GPU existente RUNNING
+            found = False
+            for zone in ZONES:
+                try:
+                    request = ListInstancesRequest(
+                        project=PROJECT, zone=zone,
+                        filter='name ~ "lana-engine-" AND status = "RUNNING"'
+                    )
+                    instances = list(client.list(request=request))
+                    if instances:
+                        inst = sorted(instances, key=lambda x: x.name, reverse=True)[0]
+                        name, zone_str = inst.name, zone
+                        print(f"[SPAWN] GPU ja ativa: {name} em {zone_str}")
+                        _update_gpu_status("ready", instance_name=name, zone=zone_str,
+                                           message="GPU L4 ativa e pronta")
+                        found = True
+                        break
+                except gcp_exceptions.NotFound:
+                    continue
+                except gcp_exceptions.GoogleAPICallError:
+                    continue
+            if found:
+                return
 
             for zone in ZONES:
                 name = f"lana-engine-l4-{int(_time.time())}-{_uuid.uuid4().hex[:4]}"
                 print(f"[SPAWN] Tentativa {attempt+1}/3 — Criando {name} em {zone}...")
                 _update_gpu_status("spawning", instance_name=name, zone=zone,
                                    message=f"Criando VM L4 em {zone} (tentativa {attempt+1}/3)")
-                res = subprocess.run(
-                    ["gcloud", "compute", "instances", "create", name,
-                     "--project", PROJECT, "--zone", zone,
-                     f"--machine-type={L4_MACHINE}",
-                     f"--image-family={IMAGE_FAMILY}",
-                     f"--image-project={IMAGE_PROJECT}",
-                     "--accelerator=count=1,type=nvidia-l4",
-                     "--boot-disk-size=100GB",
-                     "--provisioning-model=STANDARD",
-                     "--maintenance-policy=TERMINATE",
-                     "--metadata-from-file=startup-script=/app/infra/boot/startup_arch4.sh",
-                     "--scopes=cloud-platform", "--quiet", "--verbosity=none"],
-                    capture_output=True, text=True, timeout=120
-                )
-                if res.returncode == 0:
+                try:
+                    instance = Instance(
+                        name=name,
+                        machine_type=f"zones/{zone}/machineTypes/{L4_MACHINE}",
+                        disks=[AttachedDisk(
+                            boot=True,
+                            auto_delete=True,
+                            initialize_params=InitializeParams(
+                                disk_size_gb=100,
+                                source_image=f"projects/{IMAGE_PROJECT}/global/images/family/{IMAGE_FAMILY}"
+                            )
+                        )],
+                        network_interfaces=[NetworkInterface(
+                            name="nic0",
+                            access_configs=[AccessConfig(
+                                name="External NAT",
+                                type_="ONE_TO_ONE_NAT"
+                            )]
+                        )],
+                        service_accounts=[ServiceAccount(
+                            email="default",
+                            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+                        )],
+                        scheduling=Scheduling(
+                            provisioning_model="STANDARD",
+                            on_host_maintenance="TERMINATE"
+                        ),
+                        guest_accelerators=[AcceleratorConfig(
+                            accelerator_count=1,
+                            accelerator_type=f"projects/{PROJECT}/zones/{zone}/acceleratorTypes/nvidia-l4"
+                        )],
+                        metadata=Metadata(
+                            items=[Items(key="startup-script", value=STARTUP_SCRIPT)]
+                        )
+                    )
+                    client.insert(project=PROJECT, zone=zone, instance_resource=instance)
                     print(f"[SPAWN] GPU criada: {name} em {zone}")
                     _update_gpu_status("booting", instance_name=name, zone=zone,
                                        message="VM criada. Boot iniciando (Docker + Sentinel)")
                     return
-                err = (res.stderr or "")[:200]
-                if "Quota" in err or "GPUS_ALL_REGIONS" in err:
-                    print(f"[SPAWN] Cota cheia em {zone}, tentando proxima zona...")
+                except gcp_exceptions.ResourceExhausted:
+                    print(f"[SPAWN] Cota cheia ou stockout em {zone}, tentando proxima zona...")
                     continue
-                if "stockout" in err.lower() or "resource" in err.lower() or "ZONE_RESOURCE_POOL_EXHAUSTED" in err:
+                except gcp_exceptions.GoogleAPICallError as e:
+                    err = str(e)[:200]
+                    print(f"[SPAWN] Erro em {zone}: {err}")
                     continue
-                print(f"[SPAWN] Erro em {zone}: {err}")
         except Exception as e:
             print(f"[SPAWN] Erro tentativa {attempt+1}: {e}")
         if attempt < 2:
