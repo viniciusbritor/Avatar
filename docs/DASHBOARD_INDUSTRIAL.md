@@ -10,7 +10,7 @@
 
 | Componente | Local | Status |
 |---|---|---|
-| API | VM `lana-api` (us-east1-b, IP 35.231.46.76) | Ativa |
+| API | VM `lana-api` (us-east1-c, IP 35.231.46.76) | Ativa |
 | GPU | `lana-engine-l4-*` (sob demanda) | Auto-spawn |
 | Firestore | `avatar_jobs` | Ativo |
 | GCS Vault | `gs://brasil-ai-avatars-vault` | Ativo |

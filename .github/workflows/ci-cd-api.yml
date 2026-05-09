@@ -52,6 +52,25 @@ jobs:
             --gcs-source-staging-dir=gs://brasil-ai-avatars-vault/cloudbuild-source/api \
             .
 
+      - name: Smoke test (valida imagem)
+        run: |
+          gcloud auth configure-docker us-east1-docker.pkg.dev --quiet
+          IMAGE="us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest"
+          docker pull "$IMAGE"
+          docker run --rm -d --name lana-smoke -p 8080:8080 \
+            -e API_SECRET_KEY=test "$IMAGE"
+          for i in $(seq 1 10); do
+            if curl -sf --max-time 3 http://localhost:8080/health; then
+              echo "=== SMOKE TEST: OK ==="
+              docker stop lana-smoke
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "=== SMOKE TEST: FAILED ==="
+          docker logs lana-smoke
+          exit 1
+
       - name: Build Concluida
         run: |
           echo "Imagem avatar-api:latest publicada no Artifact Registry."

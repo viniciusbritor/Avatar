@@ -4,8 +4,8 @@ A infraestrutura segue o princípio **Zero-Waste**: GPUs nascem e morrem sob dem
 
 ## API (VM e2-micro)
 
-- **Host:** `lana-api` (us-east1-b, IP fixo `35.231.46.76`)
-- **Deploy:** Cloud Build → Artifact Registry → VM cron auto-update (5 min)
+- **Host:** `lana-api` (us-east1-c, IP fixo `35.231.46.76`)
+- **Deploy:** Cloud Build → Artifact Registry → Deploy manual via sudo lana-update.sh (sem cron)
 - **Boot:** `infra/boot/startup-e2-micro.sh` (Docker + systemd unit)
 - **Endpoints:** POST /produce, GET /status/{job_id}, GET /health, POST /webhook/render-complete
 

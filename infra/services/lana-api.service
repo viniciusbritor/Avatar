@@ -1,18 +1,23 @@
 [Unit]
-Description=Brasil AI — Avatar API (v3.2.1)
+Description=Brasil AI — Avatar API (v3.2.4)
 After=network.target docker.service
 Requires=docker.service
 
 [Service]
-Type=simple
+Type=exec
 ExecStartPre=-/usr/bin/docker rm -f lana-api
-ExecStart=/usr/bin/docker run --name lana-api \
-    --restart=no \
+ExecStart=/usr/bin/docker run --pull always \
+    --name lana-api \
+    --restart unless-stopped \
     --network host \
     us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest
-ExecStop=/usr/bin/docker stop lana-api
-Restart=always
-RestartSec=5
+ExecStop=/usr/bin/docker stop -t 10 lana-api
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=90
+TimeoutStopSec=15
+StartLimitIntervalSec=60
+StartLimitBurst=3
 
 [Install]
 WantedBy=multi-user.target
