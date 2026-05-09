@@ -60,6 +60,33 @@ def _update_gpu_firestore(state: str, message: str = ""):
     except Exception as e:
         print(f"[GPU_STATUS] Erro Firestore: {e}")
 
+def _monitor_progress(progress_file, job_id, stop_event):
+    """Thread: le progress.json a cada 2s e atualiza Firestore."""
+    # Aguarda arquivo ser criado
+    for _ in range(30):
+        if os.path.exists(progress_file):
+            break
+        time.sleep(1)
+    
+    last_phase = ""
+    while not stop_event.is_set():
+        try:
+            if os.path.exists(progress_file):
+                with open(progress_file, 'r') as f:
+                    data = json.load(f)
+                phase = data.get("phase", "")
+                percent = data.get("percent", 0)
+                message = data.get("message", "")
+                
+                if phase != last_phase:
+                    last_phase = phase
+                    msg = f"[{phase}] {message} ({percent}%)"
+                    _update_gpu_firestore("rendering" if phase != "done" else "idle", msg)
+                    print(f"[PROGRESS] {msg}")
+        except Exception:
+            pass
+        time.sleep(2)
+
 # Configurações de Caminhos (Padrão Industrial V17)
 VOLUME_PATH = "/workspace"
 ASSETS_DIR = "/workspace/latentsync/assets"
@@ -214,6 +241,13 @@ def run_inference(job_id, audio_url, template, webhook_url=None):
         # 4. LatentSync Inference
         print(f"🚀 [WORKER] Iniciando Job {job_id}...")
         _update_gpu_firestore("rendering", f"Renderizando job {job_id}: {template}")
+        
+        # Progress tracking
+        progress_file = f"{TEMP_DIR}/{job_id}_progress.json"
+        stop_event = threading.Event()
+        monitor_thread = threading.Thread(target=_monitor_progress, args=(progress_file, job_id, stop_event), daemon=True)
+        monitor_thread.start()
+        
         env = os.environ.copy()
         env["PYTHONPATH"] = "."
         
@@ -227,11 +261,19 @@ def run_inference(job_id, audio_url, template, webhook_url=None):
             "--video_path", template_video,
             "--audio_path", audio_dest,
             "--video_out_path", video_output,
+            "--progress_file", progress_file,
         ]
         
         log_file = f"{TEMP_DIR}/{job_id}_render.log"
         with open(log_file, "w") as f_log:
             inf_proc = subprocess.run(cmd, env=env, stdout=f_log, stderr=f_log, text=True, cwd="/workspace/latentsync")
+        
+        # Stop progress monitor
+        stop_event.set()
+        monitor_thread.join(timeout=3)
+        # Cleanup
+        try: os.remove(progress_file)
+        except: pass
             
         if inf_proc.returncode != 0:
             with open(log_file, "r") as f_log:
