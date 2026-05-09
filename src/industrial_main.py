@@ -13,6 +13,53 @@ from google.cloud import storage, firestore
 
 app = FastAPI(title="Brasil AI Industrial Avatar Engine")
 
+# ── GPU Status (Firestore para dashboard near-real-time) ──────────────────
+BRT = timezone(timedelta(hours=-3))
+try:
+    _db = firestore.Client(project="brasili-ia-news")
+    GPU_STATUS = _db.collection("gpu_status")
+except Exception:
+    _db = None
+    GPU_STATUS = None
+
+def _get_instance_name():
+    """Obtem nome da instancia via metadata server."""
+    try:
+        r = requests.get(
+            "http://metadata.google.internal/computeMetadata/v1/instance/name",
+            headers={"Metadata-Flavor": "Google"}, timeout=3
+        )
+        return r.text.strip() if r.status_code == 200 else "l4-unknown"
+    except Exception:
+        return "l4-unknown"
+
+def _get_instance_zone():
+    try:
+        r = requests.get(
+            "http://metadata.google.internal/computeMetadata/v1/instance/zone",
+            headers={"Metadata-Flavor": "Google"}, timeout=3
+        )
+        return r.text.strip().split("/")[-1] if r.status_code == 200 else ""
+    except Exception:
+        return ""
+
+def _update_gpu_firestore(state: str, message: str = ""):
+    """Atualiza status da GPU no Firestore para o dashboard."""
+    if not GPU_STATUS:
+        return
+    try:
+        inst = _get_instance_name()
+        zone = _get_instance_zone()
+        GPU_STATUS.document("latest").set({
+            "state": state,
+            "instance": inst,
+            "zone": zone,
+            "message": message,
+            "updated_at": datetime.now(BRT).isoformat()
+        })
+    except Exception as e:
+        print(f"[GPU_STATUS] Erro Firestore: {e}")
+
 # Configurações de Caminhos (Padrão Industrial V17)
 VOLUME_PATH = "/workspace"
 ASSETS_DIR = "/workspace/latentsync/assets"
@@ -146,6 +193,7 @@ def run_inference_wrapper(*args, **kwargs):
         run_inference(*args, **kwargs)
     finally:
         print("🔓 [WORKER] Lock liberado. GPU pronta para novo Job.")
+        _update_gpu_firestore("idle", "Aguardando proximo job")
         IS_BUSY = False
 
 def run_inference(job_id, audio_url, template, webhook_url=None):
@@ -165,6 +213,7 @@ def run_inference(job_id, audio_url, template, webhook_url=None):
         
         # 4. LatentSync Inference
         print(f"🚀 [WORKER] Iniciando Job {job_id}...")
+        _update_gpu_firestore("rendering", f"Renderizando job {job_id}: {template}")
         env = os.environ.copy()
         env["PYTHONPATH"] = "."
         
@@ -214,6 +263,7 @@ def run_inference(job_id, audio_url, template, webhook_url=None):
             remote_filename = f"avatar_{ts}.mp4"
             remote_path = f"outputs/{remote_filename}"
             print(f"📦 [GCS] Iniciando upload: {remote_path}")
+            _update_gpu_firestore("uploading", f"Subindo video para GCS: {remote_filename}")
             
             try:
                 storage_client = storage.Client()
@@ -273,6 +323,7 @@ def poll_pending_jobs():
     """Polling continuo com auto-shutdown: idle 15min, after-job 5min, dead man 120min."""
     global IS_BUSY
     print("[POLLER] Iniciando watcher de jobs (shutdown: idle=15min, after-job=5min)...")
+    _update_gpu_firestore("ready", "GPU L4 pronta. Aguardando jobs no Firestore.")
     idle_count = 0
     MAX_IDLE = 90  # 90 × 10s = 15 min
     cooldown = False
