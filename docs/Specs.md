@@ -58,12 +58,21 @@
 | IP estatico | ~$3/mes |
 | GPU L4 (sob demanda) | ~$0.70/h |
 
-## 8. CI/CD
+## 8. CI/CD (GitHub Actions → Cloud Build → Deploy)
+
+**REGRA GLOBAL:** Toda alteração no código deve ser commitada no git. Push no `master` dispara automaticamente.
+
+| Gatilho (paths) | Workflow | O que faz |
+|---|---|---|
+| `api/**`, `src/**`, `infra/**` | `ci-cd-api.yml` | Build + push `avatar-api:latest` → trigger GCS → VM puxa |
+| `latentsync/**`, `infra/docker/Dockerfile.avatar-l4-v2.10-golden`, `src/**` | `ci-cd-l4.yml` | Build + push `avatar-l4:v2.10-golden` |
+
 | YAML | Proposito |
 |---|---|
-| `cloudbuild-api.yaml` | Build + push API |
-| `cloudbuild-l4-golden.yaml` | Build golden L4 |
-| `cloudbuild-all.yaml` | Ambos (release) |
+| `cloudbuild-api.yaml` | Cloud Build: API image |
+| `cloudbuild-l4-golden.yaml` | Cloud Build: L4 golden image (gsutil pre-step + docker build) |
+
+**Auto-cleanup:** `docker system prune -af` roda antes de cada pull na VM e2-micro (previne disco cheio).
 
 ## 9. Branches
 | Branch | Status |
