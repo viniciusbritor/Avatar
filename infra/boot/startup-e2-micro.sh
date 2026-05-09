@@ -70,7 +70,9 @@ REMOTE_TS=$(gsutil cp "$TRIGGER" - 2>/dev/null | head -1 | tr -d '\n\r ')
 
 LOCAL_TS=$(cat "$STATE_FILE" 2>/dev/null)
 if [ "$REMOTE_TS" != "$LOCAL_TS" ]; then
-    echo "[TRIGGER-UPDATE] $(date): new trigger detected. Pulling..."
+    echo "[TRIGGER-UPDATE] $(date): new trigger detected."
+    # ZERO-WASTE: limpar imagens/containers velhos antes de puxar
+    docker system prune -af 2>/dev/null || true
     docker pull "$IMAGE"
     docker image prune -f
     systemctl restart lana-api.service
