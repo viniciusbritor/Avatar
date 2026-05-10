@@ -92,7 +92,7 @@ O sistema é dividido em duas camadas de responsabilidade distinta, conectadas v
 - **A IMAGEM DO WORKER** deve conter tudo (Imutável), com código como última layer para cache eficiente.
 - **WEBHOOK URL** deve ser sempre `http://35.231.46.76:8080/webhook/render-complete` (hardcoded). Nunca use `request.base_url` — proxies e clientes podem injetar `https://`, quebrando a comunicação L4 → API na porta 8080 crua (sem TLS).
 - **L4 BOOT:** O código Python do worker (`src/industrial_main.py`) deve ser obtido via `git clone` do repositório GitHub no startup script. NUNCA use `docker cp` da imagem golden (código congelado causa regressão de bugs).
-- **ZONE FALLBACK:** Se `us-east1-b` estiver sem capacidade (`ZONE_RESOURCE_POOL_EXHAUSTED`), migrar para `us-east1-c` ou `us-east1-d`. O IP estático `35.231.46.76` é regional e acompanha a migração.
+- **ZONE FALLBACK:** Se `us-east1-c` estiver sem capacidade (`ZONE_RESOURCE_POOL_EXHAUSTED`), migrar para `us-east1-b` ou `us-east1-d`. O IP estático `35.231.46.76` é regional e acompanha a migração.
 - **ZERO SA KEYS:** NUNCA adicione `credentials_json` ou Service Account Keys nos workflows. Use exclusivamente Workload Identity Federation (`workload_identity_provider` + `service_account`). Chaves exportadas são proibidas — tokens OIDC de curta duração são o único meio de autenticação CI/CD.
 
 ---
