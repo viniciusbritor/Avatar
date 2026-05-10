@@ -99,7 +99,7 @@ def _cleanup_l4_residue(project: str):
             try:
                 request = ListInstancesRequest(
                     project=project, zone=zone,
-                    filter='name ~ "lana-engine-" AND status = "TERMINATED"'
+                    filter='name:"lana-engine-" AND status = "TERMINATED"'
                 )
                 for instance in client.list(request=request):
                     name = instance.name
@@ -138,7 +138,7 @@ def _scan_garbage():
             try:
                 request = ListInstancesRequest(
                     project=PROJECT, zone=zone,
-                    filter='name ~ "lana-engine-" AND status = "TERMINATED"'
+                    filter='name:"lana-engine-" AND status = "TERMINATED"'
                 )
                 for instance in client.list(request=request):
                     garbage["instances"].append({
@@ -184,7 +184,7 @@ def _spawn_gpu():
                 try:
                     request = ListInstancesRequest(
                         project=PROJECT, zone=zone,
-                        filter='name ~ "lana-engine-" AND status = "RUNNING"'
+                        filter='name:"lana-engine-" AND status = "RUNNING"'
                     )
                     instances = list(client.list(request=request))
                     if instances:
