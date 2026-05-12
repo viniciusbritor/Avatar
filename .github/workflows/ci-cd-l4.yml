@@ -1,4 +1,4 @@
-name: CI/CD - L4 Golden Image
+name: CI/CD - L4 Image
 
 permissions:
   id-token: write
@@ -11,17 +11,15 @@ on:
       - 'latentsync'
       - 'latentsync/**'
       - 'infra/docker/Dockerfile.avatar-l4-v2.10'
-      - 'infra/docker/Dockerfile.avatar-l4-v2.10-golden'
       - 'infra/reference/requirements-l4.txt'
       - 'src/**'
       - 'cloudbuild-l4.yaml'
-      - 'cloudbuild-l4-golden.yaml'
       - '.github/workflows/ci-cd-l4.yml'
   workflow_dispatch:
 
 jobs:
   build-and-push:
-    name: Build & Push L4 Golden Image
+    name: Build & Push L4 Image
     runs-on: ubuntu-22.04
     timeout-minutes: 60
 
@@ -43,18 +41,7 @@ jobs:
         with:
           project_id: brasili-ia-news
 
-      - name: Cloud Build (L4 Golden)
-        run: |
-          gcloud auth list
-          gcloud builds submit \
-            --config=cloudbuild-l4-golden.yaml \
-            --region=us-east1 \
-            --project=brasili-ia-news \
-            --async \
-            --gcs-source-staging-dir=gs://brasil-ai-avatars-vault/cloudbuild-source/l4 \
-            .
-
-      - name: Cloud Build (L4 v2.10 - Deps Only)
+      - name: Cloud Build (L4)
         run: |
           gcloud builds submit \
             --config=cloudbuild-l4.yaml \
