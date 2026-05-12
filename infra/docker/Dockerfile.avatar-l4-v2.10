@@ -5,11 +5,14 @@
 #   3. ML Core                  — rebuild só se mudar diffusers/transformers
 #   4. LatentSync Deps          — rebuild só se adicionar lib nova
 #   5. DeepCache (git)          — rebuild só se mudar ref do repo
-#   6. CÓDIGO (src/)            — rebuild rápido, última layer
+#   6. API Server deps          — rebuild só se mudar fastapi/uvicorn
 #
-# Ganho: mudar 1 linha de código Python → 5 segundos (só layer 6)
-#        adicionar 1 lib nova → 2-3 minutos (layer 4+5+6)
+# Ganho: mudar 1 lib nova → 2-3 minutos (layer 4+5+6)
 #        mudar PyTorch → 15 minutos (layer 2 a 6)
+#
+# NOTA: Código Python (src/ + latentsync/) NÃO vai na imagem.
+#       Obtido via git clone pelo startup_arch4.sh no boot da VM.
+#       Ver ARCHITECTURE.md: "NUNCA use docker cp da imagem golden"
 
 FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 
@@ -103,20 +106,16 @@ RUN pip3 install --no-cache-dir \
     git+https://github.com/horseee/DeepCache.git@master
 
 # ═══════════════════════════════════════════════════════════════════════════
-# LAYER 7: CÓDIGO DA APLICAÇÃO (última layer = rebuild instantâneo)
+# LAYER 7: Workspace (código Python NÃO vai na imagem)
 # ═══════════════════════════════════════════════════════════════════════════
-# Copia OS ARQUIVOS que o motor precisa para rodar.
-# A codebase LatentSync (~120 arquivos) NÃO vai na imagem para não pesar.
-# Ela é sincronizada via GCS no bootstrap (rápido, ~15s).
-
+# O código (src/ + latentsync/) é obtido via git clone pelo startup_arch4.sh.
+# A imagem contém APENAS dependências de sistema e pip (layers 1-6).
+# Ver ARCHITECTURE.md: "NUNCA extraído da imagem golden"
+ENV PYTHONPATH=/workspace/latentsync:/workspace/src
 WORKDIR /workspace
-RUN mkdir -p /workspace/src /workspace/outputs/temp /workspace/latentsync/assets \
+RUN mkdir -p /workspace/outputs/temp /workspace/latentsync/assets \
     && chmod -R 777 /workspace
 
-COPY src/industrial_main.py /workspace/src/industrial_main.py
-COPY src/lipsync_pipeline.py /workspace/src/lipsync_pipeline.py
-COPY src/secrets_manager.py /workspace/src/secrets_manager.py
-
 LABEL project="Lana"
-LABEL tier="Industrial-V19"
+LABEL tier="Industrial-V20"
 LABEL version="2.10"

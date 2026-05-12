@@ -20,12 +20,13 @@ BUCKET_NAME = get_secret("GCS_VAULT_BUCKET", fallback="brasil-ai-avatars-vault")
 # TIER 1: NVIDIA L4 (Premium Performance)
 L4_IMAGE_FAMILY = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts"
 L4_MACHINE = "g2-standard-12"
+PROVISIONING_MODEL = "STANDARD"
 
 ELEVENLABS_API_KEY = get_secret("ELEVEN_LABS_API_KEY")
 if ELEVENLABS_API_KEY:
     ELEVENLABS_API_KEY = ELEVENLABS_API_KEY.strip()
 VOICE_ID = get_secret("ELEVEN_VOICE_ID")  # Matilda (ajustada para pt-BR) via Secret Manager
-DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden"
+DOCKER_IMAGE = "us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10"
 
 class LanaIndustrialEngine:
     """Ferramentas de infraestrutura GCP com Inteligência Maestro V18 (Gold Standard)."""
@@ -264,7 +265,7 @@ class LanaIndustrialEngine:
     def _create_gpu_instance(self, name, zone):
         """Cria uma instância L4 usando Arquitetura 4 (Nativa + Startup Script)."""
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        startup_script_path = os.path.join(base_dir, "infra", "startup_arch4.sh")
+        startup_script_path = os.path.join(base_dir, "infra", "boot", "startup_arch4.sh")
         
         cmd = [
             "gcloud", "compute", "instances", "create", name,
@@ -274,7 +275,7 @@ class LanaIndustrialEngine:
             f"--image-project=deeplearning-platform-release",
             "--accelerator=count=1,type=nvidia-l4",
             "--boot-disk-size=100GB",
-            "--provisioning-model=STANDARD",
+            f"--provisioning-model={PROVISIONING_MODEL}",
             "--maintenance-policy=TERMINATE",
             f"--metadata-from-file=startup-script={startup_script_path}",
             "--scopes=cloud-platform", # Essencial para GCS Fuse e Artifact Registry
@@ -361,6 +362,9 @@ class LanaIndustrialEngine:
                 f"sudo docker rm -f lana-engine 2>/dev/null; "
                 f"sudo gcloud auth configure-docker us-east1-docker.pkg.dev --quiet; "
                 f"sudo docker pull {DOCKER_IMAGE}; "
+                f"if [ -d /workspace/.git ]; then git -C /workspace pull --recurse-submodules && git -C /workspace submodule update --init --recursive; else git clone --recurse-submodules https://github.com/viniciusbritor/Avatar.git /workspace/; fi; "
+                f"sudo cp /workspace/infra/docker/lipsync_pipeline_v30.py /workspace/latentsync/latentsync/pipelines/lipsync_pipeline.py; "
+                f"sudo cp /workspace/infra/docker/inference.py /workspace/latentsync/scripts/inference.py; "
                 f"sudo rm -rf /workspace/latentsync/checkpoints; "
                 f"sudo ln -sfn /mnt/weights /workspace/latentsync/checkpoints; "
                 f"sudo docker run -d --name lana-engine --gpus all --network host "
@@ -425,7 +429,7 @@ class LanaIndustrialEngine:
 
     def bootstrap_v18(self, is_prebaked=False):
         """
-        Bootstrap v2.10-golden — LatentSync na imagem, sem sync GCS de código.
+        Bootstrap v2.10 — código Python via git clone, imagem com deps apenas.
         Pull da imagem e run do container são comandos SSH separados.
         """
         GCS_ASSETS = "gs://lana-weights-universal/assets"
@@ -449,10 +453,10 @@ class LanaIndustrialEngine:
                     time.sleep(5)
             return res
 
-        print("\n[AGNO] === INICIANDO BOOTSTRAP v2.10-golden ===")
+        print("\n[AGNO] === INICIANDO BOOTSTRAP v2.10 ===")
         
         # 1. Aguardar Docker + preparar ambiente
-        print("[AGNO] [1/4] Aguardando Docker e autenticando registry...")
+        print("[AGNO] [1/5] Aguardando Docker e autenticando registry...")
         for i in range(30):
             check_res = _ssh("which docker && sudo docker ps > /dev/null 2>&1 && echo DOCKER_OK", "DOCKER_WAIT")
             if "DOCKER_OK" in check_res.stdout:
@@ -471,11 +475,35 @@ class LanaIndustrialEngine:
         else:
             raise Exception(f"Falha no setup inicial: {res.stderr}")
 
-        # 2. Assets + checkpoints (ainda no GCS, ~10s)
-        print("[AGNO] [2/4] Sincronizando assets e montando checkpoints...")
+        # 2. Pull da imagem Docker
+        if not is_prebaked:
+            print("[AGNO] [2/5] Baixando imagem Docker (~15GB)...")
+            pull_res = _ssh(f"sudo docker pull {DOCKER_IMAGE}", "DOCKER_PULL", max_retries=2)
+            if pull_res.returncode != 0:
+                raise Exception(f"Falha ao baixar imagem: {pull_res.stderr[:300]}")
+            print("[AGNO] Imagem Docker baixada.")
+        else:
+            print("[AGNO] [2/5] Imagem pre-baked, pulando pull.")
+
+        # 3. Git clone — código fresco do GitHub (NUNCA docker cp)
+        print("[AGNO] [3/5] Obtendo código Python via git clone...")
+        clone_res = _ssh(
+            f"if [ -d /workspace/.git ]; then "
+            f"git -C /workspace pull --recurse-submodules && git -C /workspace submodule update --init --recursive; "
+            f"else git clone --recurse-submodules https://github.com/viniciusbritor/Avatar.git /workspace/; fi",
+            "GIT_CLONE", max_retries=2
+        )
+        if clone_res.returncode != 0:
+            raise Exception(f"Falha no git clone: {clone_res.stderr[:300]}")
+        print("[AGNO] Código Python fresco obtido.")
+
+        # 4. Assets + overrides + checkpoints (após git clone, evita conflito)
+        print("[AGNO] [4/5] Sincronizando assets, overrides e checkpoints...")
         _ssh(f"gsutil -m cp {GCS_ASSETS}/*.mp4 /workspace/latentsync/assets/ 2>/dev/null || true && "
-             f"rm -rf /workspace/latentsync/checkpoints && "
-             f"ln -sfn /mnt/weights /workspace/latentsync/checkpoints", "ASSETS_CHECKPOINTS")
+             f"sudo cp /workspace/infra/docker/lipsync_pipeline_v30.py /workspace/latentsync/latentsync/pipelines/lipsync_pipeline.py && "
+             f"sudo cp /workspace/infra/docker/inference.py /workspace/latentsync/scripts/inference.py && "
+             f"sudo rm -rf /workspace/latentsync/checkpoints && "
+             f"sudo ln -sfn /mnt/weights /workspace/latentsync/checkpoints", "ASSETS_OVERRIDES")
         # Verifica que o GCS Fuse está funcional (checkpoints acessíveis)
         verify_res = _ssh("ls /workspace/latentsync/checkpoints/latentsync_unet.pt > /dev/null 2>&1 && "
                           "echo 'CHECKPOINTS_OK' || echo 'CHECKPOINTS_MISSING'", "VERIFY_CHECKPOINTS")
@@ -483,18 +511,8 @@ class LanaIndustrialEngine:
             raise Exception(f"Checkpoints inacessiveis via GCS Fuse. /mnt/weights pode estar vazio. "
                             f"Verifique o bucket lana-weights-universal.")
 
-        # 3. Pull da imagem Docker
-        if not is_prebaked:
-            print("[AGNO] [3/4] Baixando imagem Docker (~15GB)...")
-            pull_res = _ssh(f"sudo docker pull {DOCKER_IMAGE}", "DOCKER_PULL", max_retries=2)
-            if pull_res.returncode != 0:
-                raise Exception(f"Falha ao baixar imagem: {pull_res.stderr[:300]}")
-            print("[AGNO] Imagem Docker baixada.")
-        else:
-            print("[AGNO] [3/4] Imagem pre-baked, pulando pull.")
-
-        # 4. Subir container + iniciar servidor
-        print("[AGNO] [4/4] Iniciando container e servidor...")
+        # 5. Subir container + iniciar servidor
+        print("[AGNO] [5/5] Iniciando container e servidor...")
         api_key = get_secret("API_SECRET_KEY", fallback="brasilai-avatar-2026")
         run_res = _ssh(f"sudo docker rm -f lana-engine 2>/dev/null; "
                        f"sudo docker run -d --name lana-engine --gpus all --network host "

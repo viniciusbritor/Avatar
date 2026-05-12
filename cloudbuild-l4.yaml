@@ -1,0 +1,25 @@
+# ─── Brasil AI Avatar — Cloud Build: L4 v2.10 (Deps Only) ──────────────
+# Imagem leve com todas as dependências pip. Código Python vem do git clone.
+# Uso: gcloud builds submit --config=cloudbuild-l4.yaml --region=us-east1
+
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10'
+      - '-f'
+      - 'infra/docker/Dockerfile.avatar-l4-v2.10'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10'
+
+images:
+  - 'us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'

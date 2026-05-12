@@ -10,9 +10,11 @@ on:
     paths:
       - 'latentsync'
       - 'latentsync/**'
+      - 'infra/docker/Dockerfile.avatar-l4-v2.10'
       - 'infra/docker/Dockerfile.avatar-l4-v2.10-golden'
       - 'infra/reference/requirements-l4.txt'
       - 'src/**'
+      - 'cloudbuild-l4.yaml'
       - 'cloudbuild-l4-golden.yaml'
       - '.github/workflows/ci-cd-l4.yml'
   workflow_dispatch:
@@ -46,6 +48,16 @@ jobs:
           gcloud auth list
           gcloud builds submit \
             --config=cloudbuild-l4-golden.yaml \
+            --region=us-east1 \
+            --project=brasili-ia-news \
+            --async \
+            --gcs-source-staging-dir=gs://brasil-ai-avatars-vault/cloudbuild-source/l4 \
+            .
+
+      - name: Cloud Build (L4 v2.10 - Deps Only)
+        run: |
+          gcloud builds submit \
+            --config=cloudbuild-l4.yaml \
             --region=us-east1 \
             --project=brasili-ia-news \
             --async \

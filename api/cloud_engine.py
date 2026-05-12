@@ -18,7 +18,7 @@ import subprocess
 # Adiciona src/ ao path sem modificar o código original
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from agente_lana_orchestrator import LanaIndustrialEngine, L4_MACHINE
+from agente_lana_orchestrator import LanaIndustrialEngine, L4_MACHINE, PROVISIONING_MODEL
 
 
 class CloudLanaEngine(LanaIndustrialEngine):
@@ -46,7 +46,7 @@ class CloudLanaEngine(LanaIndustrialEngine):
             "--image-project=deeplearning-platform-release",
             "--accelerator=count=1,type=nvidia-l4",
             "--boot-disk-size=100GB",
-            "--provisioning-model=STANDARD",
+            f"--provisioning-model={PROVISIONING_MODEL}",
             "--maintenance-policy=TERMINATE",
             f"--metadata-from-file=startup-script={startup_script_path}",
             "--scopes=cloud-platform",

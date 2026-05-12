@@ -54,15 +54,34 @@ for i in $(seq 1 10); do
     sleep 6
 done
 
-# 7. PULL GOLDEN IMAGE L4
-echo "--- PULL IMAGEM L4 GOLDEN ---"
+# 7. PULL L4 IMAGE (deps apenas, código Python vem do git clone)
+echo "--- PULL IMAGEM L4 v2.10 (deps) ---"
 for i in $(seq 1 5); do
     echo "PULL attempt $i..."
-    docker pull us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden && break
+    docker pull us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10 && break
     sleep 15
 done
 
-# 8. SYNC ASSETS
+# 8. GIT CLONE — código fresco do GitHub (NUNCA docker cp)
+#    ARCHITECTURE.md: "Código Python obtido fresco do GitHub no boot"
+echo "--- GIT CLONE REPO + SUBMODULES ---"
+if [ -d /workspace/.git ]; then
+    git -C /workspace pull --recurse-submodules || true
+    git -C /workspace submodule update --init --recursive
+else
+    git clone --recurse-submodules https://github.com/viniciusbritor/Avatar.git /workspace/ || {
+        echo "FATAL: git clone falhou. Abortando boot."
+        exit 1
+    }
+fi
+
+# 9. OVERRIDES CRÍTICOS (patches que estavam na golden image)
+#    V30 contrast fix + GFPGAN photorealism + progress tracking
+echo "--- APLICANDO OVERRIDES (V30 + Progress Tracking) ---"
+cp /workspace/infra/docker/lipsync_pipeline_v30.py /workspace/latentsync/latentsync/pipelines/lipsync_pipeline.py
+cp /workspace/infra/docker/inference.py /workspace/latentsync/scripts/inference.py
+
+# 10. SYNC ASSETS + CHECKPOINTS (após git clone, sem conflito)
 echo "--- SYNC ASSETS ---"
 mkdir -p /workspace/latentsync/assets
 gsutil -m cp gs://lana-weights-universal/assets/*.mp4 /workspace/latentsync/assets/ 2>/dev/null || true
@@ -70,19 +89,7 @@ rm -rf /workspace/latentsync/checkpoints
 ln -sfn /mnt/weights /workspace/latentsync/checkpoints
 chmod -R 777 /workspace
 
-# 9. COPIAR CÓDIGO PYTHON DA IMAGEM PARA O HOST
-#    A imagem golden tem os scripts em /workspace/src/,
-#    mas o mount -v /workspace:/workspace esconde eles.
-#    Extraímos para /workspace/src/ no host antes de rodar.
-echo "--- EXTRAINDO CODIGO PYTHON DA IMAGEM ---"
-TEMP_CONTAINER=$(docker create us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden)
-docker cp "$TEMP_CONTAINER:/workspace/src" /workspace/src
-docker cp "$TEMP_CONTAINER:/workspace/latentsync/." /workspace/latentsync
-docker rm "$TEMP_CONTAINER"
-chmod -R 777 /workspace/src
-chmod -R 777 /workspace/latentsync
-
-# 10. RUN CONTAINER (com auto-recovery CUDA)
+# 11. RUN CONTAINER (com auto-recovery CUDA)
 echo "--- INICIANDO CONTAINER L4 ---"
 docker rm -f lana-engine 2>/dev/null
 docker run -d --name lana-engine \
@@ -92,7 +99,7 @@ docker run -d --name lana-engine \
     -e API_SECRET_KEY="brasilai-avatar-2026" \
     -v /workspace:/workspace \
     -v /mnt/weights:/mnt/weights \
-    us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden \
+    us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10 \
     python3 /workspace/src/industrial_main.py
 
 # Auto-recovery: se CUDA falhar (Docker acabou de reiniciar, runtime NVIDIA
@@ -109,16 +116,17 @@ if ! docker exec lana-engine python3 -c "import torch; print('CUDA:', torch.cuda
         -e API_SECRET_KEY="brasilai-avatar-2026" \
         -v /workspace:/workspace \
         -v /mnt/weights:/mnt/weights \
-        us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10-golden \
+        us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-l4:v2.10 \
         python3 /workspace/src/industrial_main.py
     echo "[BOOT] Container recriado apos recovery CUDA."
 else
     echo "[BOOT] CUDA OK no primeiro start."
 fi
 
-# 11. SENTINEL NO HOST (systemd — roda FORA do container)
-#    Se o container morrer → shutdown em MAX_DEAD_CYCLES
-#    Se a GPU ficar idle → shutdown em MAX_IDLE_CYCLES
+# 12. SENTINEL NO HOST (systemd — roda FORA do container)
+#    Se o container morrer → delete instância em MAX_DEAD_CYCLES
+#    Se a GPU ficar idle → delete instância em MAX_IDLE_CYCLES
+#    Sinal shutdown_now (do container) → delete imediato
 cat <<'SENTINEL_EOF' > /usr/local/bin/lana-host-sentinel.sh
 #!/bin/bash
 STATUS_FILE="/workspace/sentinel_status.json"
@@ -127,6 +135,32 @@ DEAD_CYCLES=0
 MAX_IDLE=60           # 30 min (30s * 60)
 MAX_DEAD=60           # 30 min (30s * 60) — container morreu
 BOOT_GRACE=600        # 10 min de graça no boot
+
+# --- Delete instance + disk (Zero-Waste). Fallback: poweroff se falhar. ---
+delete_instance() {
+    local NAME ZONE PROJECT
+    PROJECT="brasili-ia-news"
+    NAME=$(curl -sf -H "Metadata-Flavor: Google" \
+        http://metadata.google.internal/computeMetadata/v1/instance/name 2>/dev/null)
+    ZONE=$(curl -sf -H "Metadata-Flavor: Google" \
+        http://metadata.google.internal/computeMetadata/v1/instance/zone 2>/dev/null | awk -F/ '{print $NF}')
+
+    if [ -n "$NAME" ] && [ -n "$ZONE" ]; then
+        echo "[SHUTDOWN] Deletando instancia $NAME ($ZONE) com disco..."
+        if gcloud compute instances delete "$NAME" \
+            --zone="$ZONE" \
+            --project="$PROJECT" \
+            --delete-disks=all \
+            --quiet 2>/dev/null; then
+            echo "[SHUTDOWN] Instancia + disco deletados. Custo Zero."
+            return 0
+        fi
+        echo "[SHUTDOWN] gcloud delete falhou. Fallback para poweroff."
+    else
+        echo "[SHUTDOWN] Metadata indisponivel (NAME='$NAME' ZONE='$ZONE'). Fallback para poweroff."
+    fi
+    sudo poweroff
+}
 
 echo "[SENTINEL-HOST] Iniciado. Monitorando container lana-engine + GPU..."
 
@@ -142,6 +176,11 @@ while true; do
 
     if [ -n "$CONTAINER_ALIVE" ]; then
         DEAD_CYCLES=0
+        # Sinal de shutdown imediato vindo do container (job concluído ou idle)
+        if [ -f "/workspace/shutdown_now" ]; then
+            echo "[SHUTDOWN] Sinal shutdown_now recebido. Deletando instancia imediatamente."
+            delete_instance
+        fi
         # Container vivo: usa lógica de GPU + heartbeat
         if [ "$GPU_UTIL" -gt 5 ] || [ -f "/workspace/heartbeat" ]; then
             IDLE_CYCLES=0
@@ -179,14 +218,14 @@ JSON_EOF
 
     # Shutdown por container morto
     if [ "$DEAD_CYCLES" -ge "$MAX_DEAD" ] && [ "$UPTIME_SEC" -gt "$BOOT_GRACE" ]; then
-        echo "[SHUTDOWN] Container lana-engine morto por ${DEAD_CYCLES} ciclos. Desligando para Custo Zero."
-        sudo poweroff
+        echo "[SHUTDOWN] Container lana-engine morto por ${DEAD_CYCLES} ciclos."
+        delete_instance
     fi
 
     # Shutdown por inatividade
     if [ "$IDLE_CYCLES" -ge "$MAX_IDLE" ] && [ "$UPTIME_SEC" -gt "$BOOT_GRACE" ]; then
-        echo "[SHUTDOWN] GPU ociosa por ${IDLE_CYCLES} ciclos. Desligando para Custo Zero."
-        sudo poweroff
+        echo "[SHUTDOWN] GPU ociosa por ${IDLE_CYCLES} ciclos."
+        delete_instance
     fi
 
     sleep 30

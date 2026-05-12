@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ ./src/
 COPY api/ ./api/
-COPY infra/ ./infra/
+COPY infra/boot/ ./infra/boot/
 
 RUN chmod +x /app/api/entrypoint.sh
 

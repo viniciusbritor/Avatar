@@ -27,7 +27,7 @@ from google.cloud.compute_v1.types import (
 )
 from google.api_core import exceptions as gcp_exceptions
 
-from src.agente_lana_orchestrator import AgenteLanaOrchestrator
+from src.agente_lana_orchestrator import AgenteLanaOrchestrator, L4_MACHINE, PROVISIONING_MODEL
 from .secrets_manager import get_secret
 
 BRT = timezone(timedelta(hours=-3))
@@ -157,7 +157,6 @@ def _scan_garbage():
 
 def _spawn_gpu():
     """Background: liga ou cria VM L4 com retry 3x. Sem SSH."""
-    L4_MACHINE = "g2-standard-12"
     IMAGE_FAMILY = "common-cu129-ubuntu-2204-nvidia-580"
     IMAGE_PROJECT = "deeplearning-platform-release"
 
@@ -231,7 +230,7 @@ def _spawn_gpu():
                             scopes=["https://www.googleapis.com/auth/cloud-platform"]
                         )],
                         scheduling=Scheduling(
-                            provisioning_model="STANDARD",
+                            provisioning_model=PROVISIONING_MODEL,
                             on_host_maintenance="TERMINATE"
                         ),
                         guest_accelerators=[AcceleratorConfig(

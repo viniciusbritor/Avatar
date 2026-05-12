@@ -388,8 +388,8 @@ def poll_pending_jobs():
                     cooldown_count = 0
                     continue
                 if cooldown_count >= COOLDOWN_MAX:
-                    print(f"[POLLER] {COOLDOWN_MAX*10//60}min sem jobs. Desligando GPU...")
-                    os.system("sudo shutdown -h now")
+                    print(f"[POLLER] {COOLDOWN_MAX*10//60}min sem jobs. Sinalizando shutdown para Sentinela...")
+                    open("/workspace/shutdown_now", "w").close()
                     break
                 time.sleep(10)
                 continue
@@ -426,8 +426,8 @@ def poll_pending_jobs():
             if not found:
                 idle_count += 1
                 if idle_count >= MAX_IDLE:
-                    print(f"[POLLER] {MAX_IDLE*10//60} min ocioso. Desligando GPU...")
-                    os.system("sudo shutdown -h now")
+                    print(f"[POLLER] {MAX_IDLE*10//60} min ocioso. Sinalizando shutdown para Sentinela...")
+                    open("/workspace/shutdown_now", "w").close()
                     break
 
         except Exception as e:
