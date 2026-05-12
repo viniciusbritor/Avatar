@@ -15,12 +15,21 @@ app = FastAPI(title="Brasil AI Industrial Avatar Engine")
 
 # ── GPU Status (Firestore para dashboard near-real-time) ──────────────────
 BRT = timezone(timedelta(hours=-3))
+DB = None
+GPU_STATUS = None
+
+def _get_firestore():
+    """Singleton Firestore client (evita recriar gRPC a cada loop)."""
+    global DB, GPU_STATUS
+    if DB is None:
+        DB = firestore.Client(project="brasili-ia-news")
+        GPU_STATUS = DB.collection("gpu_status")
+    return DB, GPU_STATUS
+
 try:
-    _db = firestore.Client(project="brasili-ia-news")
-    GPU_STATUS = _db.collection("gpu_status")
+    _get_firestore()
 except Exception:
-    _db = None
-    GPU_STATUS = None
+    pass
 
 def _get_instance_name():
     """Obtem nome da instancia via metadata server."""
@@ -61,7 +70,7 @@ def _update_gpu_firestore(state: str, message: str = ""):
         print(f"[GPU_STATUS] Erro Firestore: {e}")
 
 def _monitor_progress(progress_file, job_id, stop_event):
-    """Thread: le progress.json a cada 2s e atualiza Firestore."""
+    """Thread: le progress.json a cada 10s e atualiza Firestore."""
     # Aguarda arquivo ser criado
     for _ in range(30):
         if os.path.exists(progress_file):
@@ -85,7 +94,7 @@ def _monitor_progress(progress_file, job_id, stop_event):
                     print(f"[PROGRESS] {msg}")
         except Exception:
             pass
-        time.sleep(2)
+        time.sleep(10)
 
 # Configurações de Caminhos (Padrão Industrial V17)
 VOLUME_PATH = "/workspace"
@@ -366,16 +375,23 @@ def poll_pending_jobs():
     global IS_BUSY
     print("[POLLER] Iniciando watcher de jobs (shutdown: idle=15min, after-job=5min)...")
     _update_gpu_firestore("ready", "GPU L4 pronta. Aguardando jobs no Firestore.")
+
+    db, _ = _get_firestore()
+    if db is None:
+        print("[POLLER] FATAL: Firestore indisponivel. Poller nao pode operar.")
+        return
+
+    POLL_SECONDS = 30
     idle_count = 0
-    MAX_IDLE = 90  # 90 × 10s = 15 min
+    MAX_IDLE = 30  # 30 × 30s = 15 min
     cooldown = False
     cooldown_count = 0
-    COOLDOWN_MAX = 30  # 30 × 10s = 5 min
+    COOLDOWN_MAX = 10  # 10 × 30s = 5 min
 
     while True:
         try:
             if IS_BUSY:
-                time.sleep(10)
+                time.sleep(POLL_SECONDS)
                 continue
 
             if cooldown:
@@ -388,13 +404,12 @@ def poll_pending_jobs():
                     cooldown_count = 0
                     continue
                 if cooldown_count >= COOLDOWN_MAX:
-                    print(f"[POLLER] {COOLDOWN_MAX*10//60}min sem jobs. Sinalizando shutdown para Sentinela...")
+                    print(f"[POLLER] {COOLDOWN_MAX*POLL_SECONDS//60}min sem jobs. Sinalizando shutdown para Sentinela...")
                     open("/workspace/shutdown_now", "w").close()
                     break
-                time.sleep(10)
+                time.sleep(POLL_SECONDS)
                 continue
 
-            db = firestore.Client(project="brasili-ia-news")
             docs = list(db.collection("avatar_jobs")
                         .where("status", "==", "queued")
                         .limit(10).stream())
@@ -413,7 +428,7 @@ def poll_pending_jobs():
                 cooldown = True
                 cooldown_count = 0
                 found = True
-                print(f"[POLLER] Job {job_id} iniciado. Cooldown de {COOLDOWN_MAX*10//60}min apos termino.")
+                print(f"[POLLER] Job {job_id} iniciado. Cooldown de {COOLDOWN_MAX*POLL_SECONDS//60}min apos termino.")
                 presenter = job.get("presenter_id", "lana_comentario")
                 webhook_url = job.get("webhook_url", "")
                 threading.Thread(
@@ -426,13 +441,13 @@ def poll_pending_jobs():
             if not found:
                 idle_count += 1
                 if idle_count >= MAX_IDLE:
-                    print(f"[POLLER] {MAX_IDLE*10//60} min ocioso. Sinalizando shutdown para Sentinela...")
+                    print(f"[POLLER] {MAX_IDLE*POLL_SECONDS//60} min ocioso. Sinalizando shutdown para Sentinela...")
                     open("/workspace/shutdown_now", "w").close()
                     break
 
         except Exception as e:
             print(f"[POLLER] Erro: {e}")
-        time.sleep(10)
+        time.sleep(POLL_SECONDS)
 
 @app.on_event("startup")
 def on_startup():
