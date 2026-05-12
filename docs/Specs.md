@@ -38,11 +38,9 @@
 
 ## 5. Imagens Docker (Artifact Registry)
 - **API:** `avatar-api:latest`
-- **GPU:** `avatar-l4:v2.10-golden`
+- **GPU:** `avatar-l4:v2.10`
   - CUDA 12.1 + PyTorch 2.5.1
-  - LatentSync via git submodule (`bytedance/LatentSync`)
-  - basicSR (git master) + GFPGAN + facexlib
-  - Mirror GCP do Ubuntu (apt)
+  - Dependências pip only (código via git clone no boot)
 
 ## 6. GCP
 - **Projeto:** `brasili-ia-news`
@@ -66,12 +64,13 @@
 | Gatilho (paths) | Workflow | O que faz |
 |---|---|---|
 | `api/**`, `src/**`, `infra/**` | `ci-cd-api.yml` | Build + push `avatar-api:latest` → deploy manual via `sudo lana-update.sh` |
-| `latentsync/**`, `infra/docker/Dockerfile.avatar-l4-v2.10-golden`, `src/**` | `ci-cd-l4.yml` | Build + push `avatar-l4:v2.10-golden` |
+| `latentsync/**`, `infra/docker/Dockerfile.avatar-l4-v2.10`, `src/**` | `ci-cd-l4.yml` | Build + push `avatar-l4:v2.10` |
+
 
 | YAML | Proposito |
 |---|---|
 | `cloudbuild-api.yaml` | Cloud Build: API image |
-| `cloudbuild-l4-golden.yaml` | Cloud Build: L4 golden image (gsutil pre-step + docker build) |
+| `cloudbuild-l4.yaml` | Cloud Build: L4 image (deps only) |
 
 **Auto-cleanup:** `docker image prune -af` roda após cada pull bem-sucedido na VM (previne disco cheio).
 

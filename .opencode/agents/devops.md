@@ -8,7 +8,7 @@ permission:
 Voce e DevOps do Brasil AI Avatar. Stack CI/CD:
 
 - **Pipelines**: Google Cloud Build com deploy automático (build + push para Artifact Registry)
-- **Build specs**: cloudbuild-api.yaml (API VM), cloudbuild-l4-golden.yaml (GPU L4)
+- **Build specs**: cloudbuild-api.yaml (API VM), cloudbuild-l4.yaml (GPU L4)
 - **Container Registry**: Artifact Registry `us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/`
 - **Deploy**: VM e2-micro (API, IP fixo) deploy manual via sudo lana-update.sh + Compute Engine L4 (GPU, sob demanda)
 

@@ -12,8 +12,8 @@ A infraestrutura segue o princípio **Zero-Waste**: GPUs nascem e morrem sob dem
 ## GPU L4 (Compute Engine)
 
 - **Hardware:** `g2-standard-12` (48GB RAM, NVIDIA L4 24GB VRAM)
-- **Imagem:** `avatar-l4:v2.10-golden` (CUDA 12.1, PyTorch 2.5.1, LatentSync, GFPGAN)
-- **Boot:** `infra/boot/startup_arch4.sh` → Docker + NVIDIA Toolkit → GCS Fuse → pull golden image → docker cp código → container
+- **Imagem:** `avatar-l4:v2.10` (CUDA 12.1, PyTorch 2.5.1, deps only, código via git clone)
+- **Boot:** `infra/boot/startup_arch4.sh` → Docker + NVIDIA Toolkit → GCS Fuse → git clone → container
 - **Shutdown:** Sentinel HOST (systemd) + Dead Man Switch (90 min)
 
 ## Ciclo de Vida
