@@ -4,7 +4,11 @@
 # Uso: gcloud builds submit --config=cloudbuild-l4-golden.yaml --region=us-east1
 
 steps:
-  # 0. Baixar modelos InsightFace do GCS (versionados no bucket)
+  # 0. Criar diretório de destino (necessário para gsutil -m cp -r)
+  - name: 'bash'
+    args: ['-c', 'mkdir -p /workspace/infra/models/insightface']
+
+  # 1. Baixar modelos InsightFace do GCS (versionados no bucket)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gsutil'
     args:
@@ -12,9 +16,9 @@ steps:
       - 'cp'
       - '-r'
       - 'gs://lana-weights-universal/checkpoints/auxiliary/models/buffalo_l'
-      - '/workspace/infra/models/insightface/buffalo_l'
+      - '/workspace/infra/models/insightface/'
 
-  # 1. Build da imagem Docker
+  # 2. Build da imagem Docker
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
@@ -24,7 +28,7 @@ steps:
       - 'infra/docker/Dockerfile.avatar-l4-v2.10-golden'
       - '.'
 
-  # 2. Push da imagem para Artifact Registry
+  # 3. Push da imagem para Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
