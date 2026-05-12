@@ -93,6 +93,9 @@ set -e
 IMAGE="us-east1-docker.pkg.dev/brasili-ia-news/lana-repo/avatar-api:latest"
 
 echo "=== LANA UPDATE $(date) ==="
+echo "Authenticating Artifact Registry..."
+gcloud auth configure-docker us-east1-docker.pkg.dev --quiet
+
 echo "Pulling $IMAGE ..."
 
 if ! timeout 120 docker pull "$IMAGE"; then
